@@ -22,12 +22,12 @@ All interfaces depend on `@sift/core`. The core package has zero UI concerns -- 
 
 ### Agent integration
 
-In addition to the packages in this repo, there are two files installed globally on the user's machine for OpenCode agent integration:
+The agent skill and custom tools source files are tracked in the repo at `packages/agent-skill/`:
 
-- `~/.config/opencode/skills/sift/SKILL.md` -- Agent skill definition
-- `~/.config/opencode/tools/sift.ts` -- Custom tools (`sift_list`, `sift_next`, `sift_summary`, `sift_add`, `sift_done`)
+- `packages/agent-skill/SKILL.md` -- Agent skill definition
+- `packages/agent-skill/tools/sift.ts` -- Custom tools (`sift_list`, `sift_next`, `sift_summary`, `sift_add`, `sift_done`)
 
-These are NOT tracked in this repo since they contain machine-specific paths. See `docs/agent-integration.md` for setup instructions.
+These get installed to `~/.config/opencode/` via `./scripts/install-agent.sh`. The tools file resolves the CLI dynamically (from PATH or `SIFT_CLI_PATH` env var) rather than hardcoding a path.
 
 ## Key concepts
 
