@@ -1,6 +1,6 @@
 import { List, Icon, Color, ActionPanel, Action, showToast, Toast } from "@raycast/api";
 import { useState, useEffect } from "react";
-import { getNextTasks, completeTask, type Task, type Priority } from "@sift/core";
+import { getNextTasks, completeTask, localToday, type Task, type Priority } from "@sift/core";
 import { getConfig } from "./config";
 
 const PRIORITY_ICONS: Record<Priority, { icon: Icon; color: Color }> = {
@@ -17,7 +17,7 @@ export default function NextTasks() {
   const [isLoading, setIsLoading] = useState(true);
 
   const config = getConfig();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
 
   useEffect(() => {
     async function load() {

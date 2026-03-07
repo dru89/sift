@@ -1,6 +1,6 @@
 import { List, Icon, Color, ActionPanel, Action, showToast, Toast } from "@raycast/api";
 import { useState, useEffect } from "react";
-import { scanTasks, sortByUrgency, completeTask, type Task, type Priority } from "@sift/core";
+import { scanTasks, sortByUrgency, completeTask, localToday, type Task, type Priority } from "@sift/core";
 import { getConfig } from "./config";
 
 const PRIORITY_ICONS: Record<Priority, { icon: Icon; color: Color }> = {
@@ -37,7 +37,7 @@ export default function ListTasks() {
     ? tasks.filter((t) => t.description.toLowerCase().includes(searchText.toLowerCase()))
     : tasks;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
 
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Search tasks..." onSearchTextChange={setSearchText}>

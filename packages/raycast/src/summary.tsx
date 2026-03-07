@@ -1,6 +1,6 @@
 import { List, Icon, Color, ActionPanel, Action, showToast, Toast } from "@raycast/api";
 import { useState, useEffect } from "react";
-import { getNextTasks, getOverdueTasks, scanTasks, sortByUrgency, completeTask, type Task, type Priority } from "@sift/core";
+import { getNextTasks, getOverdueTasks, scanTasks, sortByUrgency, completeTask, localToday, type Task, type Priority } from "@sift/core";
 import { getConfig } from "./config";
 
 const PRIORITY_ICONS: Record<Priority, { icon: Icon; color: Color }> = {
@@ -19,7 +19,7 @@ export default function Summary() {
   const [isLoading, setIsLoading] = useState(true);
 
   const config = getConfig();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
 
   useEffect(() => {
     async function load() {
@@ -70,7 +70,7 @@ export default function Summary() {
 
 function TaskItem({ task, config }: { task: Task; config: ReturnType<typeof getConfig> }) {
   const prio = PRIORITY_ICONS[task.priority];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const isOverdue = task.due !== null && task.due < today;
 
   return (

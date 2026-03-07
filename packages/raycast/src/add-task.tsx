@@ -1,6 +1,6 @@
 import { Form, ActionPanel, Action, showToast, Toast, popToRoot } from "@raycast/api";
 import { useState } from "react";
-import { addTask, type Priority } from "@sift/core";
+import { addTask, localDateString, type Priority } from "@sift/core";
 import { getConfig } from "./config";
 
 export default function AddTask() {
@@ -63,5 +63,5 @@ export default function AddTask() {
 }
 
 function formatDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return localDateString(date);
 }

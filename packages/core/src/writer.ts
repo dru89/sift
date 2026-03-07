@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { formatTask } from "./parser.js";
+import { localToday, addDays } from "./dates.js";
 import { type Task, type TaskStatus, type Priority, type SiftConfig } from "./types.js";
 
 /**
@@ -29,7 +30,7 @@ export async function addTask(
   config: SiftConfig,
   options: NewTaskOptions,
 ): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const dailyNotePath = getDailyNotePath(config, today);
   const fullPath = path.join(config.vaultPath, dailyNotePath);
 
@@ -115,7 +116,7 @@ export async function completeTask(
     throw new Error(`Line ${task.line} out of range in ${task.filePath}`);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
 
   // Replace the checkbox and add done date
   let updatedLine = lines[lineIdx];
@@ -143,23 +144,12 @@ function getDailyNotePath(config: SiftConfig, date: string): string {
  */
 function createDailyNoteTemplate(date: string): string {
   // Calculate surrounding dates for navigation links
-  const d = new Date(date + "T00:00:00");
-  const prev = new Date(d);
-  prev.setDate(prev.getDate() - 1);
-  const next = new Date(d);
-  next.setDate(next.getDate() + 1);
-
-  const prevStr = prev.toISOString().slice(0, 10);
-  const nextStr = next.toISOString().slice(0, 10);
+  const prevStr = addDays(date, -1);
+  const nextStr = addDays(date, 1);
 
   // Calculate the "before" dates for the tasks query
-  const twoDaysLater = new Date(d);
-  twoDaysLater.setDate(twoDaysLater.getDate() + 2);
-  const dueBefore = twoDaysLater.toISOString().slice(0, 10);
-
-  const oneDayLater = new Date(d);
-  oneDayLater.setDate(oneDayLater.getDate() + 1);
-  const scheduledBefore = oneDayLater.toISOString().slice(0, 10);
+  const dueBefore = addDays(date, 2);
+  const scheduledBefore = addDays(date, 1);
 
   return `---
 type: daily-note

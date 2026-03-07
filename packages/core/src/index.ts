@@ -11,6 +11,7 @@ export {
 export { addTask, addTaskToFile, completeTask } from "./writer.js";
 export type { NewTaskOptions } from "./writer.js";
 export { resolveConfig, writeConfig } from "./config.js";
+export { localToday, localDateString, addDays } from "./dates.js";
 export type {
   Task,
   TaskStatus,

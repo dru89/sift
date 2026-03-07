@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { glob } from "glob";
 import { parseContent } from "./parser.js";
+import { localToday } from "./dates.js";
 import { type Task, type TaskFilter, type SiftConfig, type Priority } from "./types.js";
 
 /**
@@ -154,8 +155,6 @@ export async function getNextTasks(
   config: SiftConfig,
   count: number = 10,
 ): Promise<Task[]> {
-  const today = new Date().toISOString().slice(0, 10);
-
   const tasks = await scanTasks(config, { status: "open" });
   const sorted = sortByUrgency(tasks);
   return sorted.slice(0, count);
@@ -165,7 +164,7 @@ export async function getNextTasks(
  * Get overdue tasks (due date is before today).
  */
 export async function getOverdueTasks(config: SiftConfig): Promise<Task[]> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const tasks = await scanTasks(config, { status: "open" });
   return sortByUrgency(tasks.filter((t) => t.due !== null && t.due < today));
 }
@@ -174,7 +173,7 @@ export async function getOverdueTasks(config: SiftConfig): Promise<Task[]> {
  * Get tasks due today.
  */
 export async function getDueToday(config: SiftConfig): Promise<Task[]> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const tasks = await scanTasks(config, { status: "open" });
   return sortByUrgency(tasks.filter((t) => t.due === today));
 }

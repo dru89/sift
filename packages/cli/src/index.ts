@@ -13,6 +13,7 @@ import {
   sortByUrgency,
   addTask,
   completeTask,
+  localToday,
   type Priority,
   type SiftConfig,
 } from "@sift/core";
@@ -175,7 +176,7 @@ program
   .description("Quick overview of your task status")
   .action(async () => {
     const config = await resolveConfig();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday();
 
     const allTasks = await scanTasks(config);
     const openTasks = allTasks.filter((t) => t.status === "open");

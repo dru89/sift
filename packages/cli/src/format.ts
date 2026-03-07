@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import type { Task, Priority } from "@sift/core";
+import { localToday, type Task, type Priority } from "@sift/core";
 
 /**
  * Priority display configuration: label, color, and sort indicator.
@@ -25,7 +25,7 @@ export function formatTask(task: Task, options?: { showFile?: boolean }): string
   // Add date info
   const dateParts: string[] = [];
   if (task.due) {
-    const isOverdue = task.due < new Date().toISOString().slice(0, 10);
+    const isOverdue = task.due < localToday();
     const dueStr = isOverdue ? chalk.red(`due ${task.due}`) : chalk.cyan(`due ${task.due}`);
     dateParts.push(dueStr);
   }
@@ -65,7 +65,7 @@ export function formatTaskList(tasks: Task[], header: string, options?: { showFi
 export function formatSummary(tasks: Task[]): string {
   const open = tasks.filter((t) => t.status === "open").length;
   const done = tasks.filter((t) => t.status === "done").length;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const overdue = tasks.filter((t) => t.status === "open" && t.due !== null && t.due < today).length;
   const dueToday = tasks.filter((t) => t.status === "open" && t.due === today).length;
 
