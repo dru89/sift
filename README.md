@@ -74,6 +74,29 @@ npm link --workspace=packages/cli
 
 See [packages/cli/README.md](packages/cli/README.md).
 
+### Set up the Raycast extension
+
+Requires [Raycast](https://raycast.com) on macOS.
+
+```bash
+cd packages/raycast
+npm install
+npx ray develop
+```
+
+Raycast will prompt you to set your vault path in the extension preferences on first use. See [packages/raycast/README.md](packages/raycast/README.md) for details.
+
+### Set up the OpenCode agent skill
+
+If you use [OpenCode](https://opencode.ai), sift can be added as an agent skill so your AI assistant can read and manage tasks conversationally.
+
+```bash
+# Install the skill and custom tools to ~/.config/opencode/
+./scripts/install-agent.sh
+```
+
+Then restart OpenCode. You can now say things like "what should I work on?" or "add a task to review the PR by Friday". See [docs/agent-integration.md](docs/agent-integration.md) for the full setup guide.
+
 ## Packages
 
 | Package | Description | Docs |
@@ -81,10 +104,7 @@ See [packages/cli/README.md](packages/cli/README.md).
 | [`@sift/core`](packages/core/) | Shared library: parser, scanner, writer, config | [README](packages/core/README.md) |
 | [`@sift/cli`](packages/cli/) | Command-line interface | [README](packages/cli/README.md) |
 | [Raycast extension](packages/raycast/) | Raycast commands for task management | [README](packages/raycast/README.md) |
-
-## Agent integration
-
-Sift can be used as an OpenCode agent skill, giving your AI assistant the ability to read and manage your tasks. See [docs/agent-integration.md](docs/agent-integration.md) for setup.
+| [Agent skill](packages/agent-skill/) | OpenCode skill + custom tools | [Setup guide](docs/agent-integration.md) |
 
 ## How it works
 
@@ -145,19 +165,26 @@ sift/
 │   │       ├── scanner.ts   # Find and filter tasks across the vault
 │   │       ├── writer.ts    # Add and complete tasks in markdown files
 │   │       ├── config.ts    # Configuration resolution
+│   │       ├── dates.ts     # Local timezone date helpers
 │   │       ├── types.ts     # TypeScript interfaces
 │   │       └── index.ts     # Public API
 │   ├── cli/            # @sift/cli - command-line interface
 │   │   └── src/
 │   │       ├── index.ts     # CLI commands (commander.js)
 │   │       └── format.ts    # Terminal formatting (chalk)
-│   └── raycast/        # Raycast extension
-│       └── src/
-│           ├── summary.tsx      # Task overview command
-│           ├── list-tasks.tsx   # Searchable task list
-│           ├── next-tasks.tsx   # Priority-sorted view
-│           ├── add-task.tsx     # Add task form
-│           └── config.ts       # Raycast preferences adapter
+│   ├── raycast/        # Raycast extension
+│   │   └── src/
+│   │       ├── summary.tsx      # Task overview command
+│   │       ├── list-tasks.tsx   # Searchable task list
+│   │       ├── next-tasks.tsx   # Priority-sorted view
+│   │       ├── add-task.tsx     # Add task form
+│   │       └── config.ts       # Raycast preferences adapter
+│   └── agent-skill/    # OpenCode agent integration
+│       ├── SKILL.md         # Skill definition (what the agent knows)
+│       └── tools/
+│           └── sift.ts      # Custom tools (what the agent can do)
+├── scripts/
+│   └── install-agent.sh     # Install skill + tools to ~/.config/opencode/
 ├── docs/
 │   └── agent-integration.md
 ├── AGENTS.md
