@@ -1,6 +1,14 @@
-# sift
+<p align="center">
+  <img src="images/sift.png" alt="sift" width="128" height="128">
+</p>
 
-Surface and manage your [Obsidian Tasks](https://publish.obsidian.md/tasks/) from anywhere -- terminal, Raycast, or AI agent -- without opening Obsidian.
+<h1 align="center">sift</h1>
+
+<p align="center">
+  Surface and manage your <a href="https://publish.obsidian.md/tasks/">Obsidian Tasks</a> from anywhere -- terminal, Raycast, or AI agent -- without opening Obsidian.
+</p>
+
+---
 
 Sift reads your Obsidian vault directly, parses tasks in the [emoji format](https://publish.obsidian.md/tasks/Reference/Task+Formats/Tasks+Emoji+Format), and lets you query, prioritize, add, and complete tasks from multiple interfaces.
 
