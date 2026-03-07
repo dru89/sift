@@ -2,6 +2,7 @@
   "name": "@sift/cli",
   "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
   "description": "CLI for sift - surface tasks from your Obsidian vault",
   "bin": {
     "sift": "dist/index.js"
