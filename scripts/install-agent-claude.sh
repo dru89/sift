@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Install sift MCP server for Claude Code and Claude Desktop.
 #
-# This script adds the sift MCP server configuration to:
+# This script automatically configures the sift MCP server in:
 # - Claude Desktop: ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)
-# - Claude Code: Uses npx to run the MCP server
+# - Claude Code:    ~/.claude.json (global MCP server config)
 #
 # Run from the repo root:
 #   ./scripts/install-agent-claude.sh
@@ -23,7 +23,7 @@ if [ ! -f "$MCP_SERVER_PATH" ]; then
     exit 1
 fi
 
-# Determine SIFT_CLI_PATH
+# Determine if we need SIFT_CLI_PATH
 if command -v sift &> /dev/null; then
     echo "  sift is on your PATH -- MCP server will use it directly."
     SIFT_CLI_PATH=""
@@ -40,67 +40,62 @@ else
     fi
 fi
 
-# Install for Claude Desktop (macOS)
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    CLAUDE_CONFIG_DIR="$HOME/Library/Application Support/Claude"
-    CLAUDE_CONFIG_FILE="$CLAUDE_CONFIG_DIR/claude_desktop_config.json"
-
-    mkdir -p "$CLAUDE_CONFIG_DIR"
-
-    # Create or update config file
-    if [ -f "$CLAUDE_CONFIG_FILE" ]; then
-        echo ""
-        echo "  Found existing Claude Desktop config: $CLAUDE_CONFIG_FILE"
-        echo ""
-        echo "  Add this to your mcpServers section:"
-    else
-        echo ""
-        echo "  Creating new Claude Desktop config: $CLAUDE_CONFIG_FILE"
-        echo '{
-  "mcpServers": {}
-}' > "$CLAUDE_CONFIG_FILE"
-    fi
-
-    # Build the MCP server config
-    if [ -n "$SIFT_CLI_PATH" ]; then
-        cat <<EOF
-
-    "sift": {
-      "command": "node",
-      "args": ["$MCP_SERVER_PATH"],
-      "env": {
-        "SIFT_CLI_PATH": "$SIFT_CLI_PATH"
-      }
-    }
-EOF
-    else
-        cat <<EOF
-
-    "sift": {
-      "command": "node",
-      "args": ["$MCP_SERVER_PATH"]
-    }
-EOF
-    fi
-
-    echo ""
-    echo "  After adding this configuration, restart Claude Desktop."
-fi
-
-# Instructions for Claude Code
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "For Claude Code (CLI):"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "Claude Code can run the MCP server directly. Use this command:"
-echo ""
+# Build the JSON snippet for the sift MCP server entry
 if [ -n "$SIFT_CLI_PATH" ]; then
-    echo "  SIFT_CLI_PATH=\"$SIFT_CLI_PATH\" node \"$MCP_SERVER_PATH\""
+    MCP_SERVER_JSON=$(node -e "
+        console.log(JSON.stringify({
+            command: 'node',
+            args: ['$MCP_SERVER_PATH'],
+            env: { SIFT_CLI_PATH: '$SIFT_CLI_PATH' }
+        }, null, 2));
+    ")
 else
-    echo "  node \"$MCP_SERVER_PATH\""
+    MCP_SERVER_JSON=$(node -e "
+        console.log(JSON.stringify({
+            command: 'node',
+            args: ['$MCP_SERVER_PATH']
+        }, null, 2));
+    ")
 fi
+
+# ── Claude Desktop ─────────────────────────────────────────────────────────────
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    CLAUDE_DESKTOP_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+    mkdir -p "$(dirname "$CLAUDE_DESKTOP_CONFIG")"
+
+    if [ ! -f "$CLAUDE_DESKTOP_CONFIG" ]; then
+        echo '{"mcpServers":{}}' > "$CLAUDE_DESKTOP_CONFIG"
+    fi
+
+    node -e "
+        const fs = require('fs');
+        const config = JSON.parse(fs.readFileSync('$CLAUDE_DESKTOP_CONFIG', 'utf8'));
+        if (!config.mcpServers) config.mcpServers = {};
+        config.mcpServers.sift = $MCP_SERVER_JSON;
+        fs.writeFileSync('$CLAUDE_DESKTOP_CONFIG', JSON.stringify(config, null, 2));
+    "
+
+    echo "  Claude Desktop: $CLAUDE_DESKTOP_CONFIG"
+fi
+
+# ── Claude Code ────────────────────────────────────────────────────────────────
+
+CLAUDE_CODE_CONFIG="$HOME/.claude.json"
+
+if [ ! -f "$CLAUDE_CODE_CONFIG" ]; then
+    echo '{}' > "$CLAUDE_CODE_CONFIG"
+fi
+
+node -e "
+    const fs = require('fs');
+    const config = JSON.parse(fs.readFileSync('$CLAUDE_CODE_CONFIG', 'utf8'));
+    if (!config.mcpServers) config.mcpServers = {};
+    config.mcpServers.sift = $MCP_SERVER_JSON;
+    fs.writeFileSync('$CLAUDE_CODE_CONFIG', JSON.stringify(config, null, 2));
+"
+
+echo "  Claude Code:    $CLAUDE_CODE_CONFIG"
+
 echo ""
-echo "Or configure it in your MCP server settings."
-echo ""
-echo "Done!"
+echo "Done. Restart Claude Desktop and/or Claude Code to pick up the changes."

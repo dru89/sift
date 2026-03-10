@@ -25,17 +25,21 @@ All integrations provide the same five core tools:
 npm install
 npm run build
 
-# 2. Configure your vault (if not already done)
-node packages/cli/dist/index.js init "/path/to/your/vault"
-# Or if globally linked: sift init "/path/to/your/vault"
+# 2. Link sift globally so the MCP server can find it
+npm link --workspace=packages/cli
 
-# 3. Install MCP server configuration
+# 3. Configure your vault (if not already done)
+sift init "/path/to/your/vault"
+
+# 4. Run the install script -- it writes config for both Claude Desktop and Claude Code
 ./scripts/install-agent-claude.sh
 
-# 4. Follow the printed instructions to:
-#    - Add MCP config to Claude Desktop (if using)
-#    - Note the npx command for Claude Code (if using)
+# 5. Restart Claude Desktop and/or Claude Code
 ```
+
+The install script automatically updates:
+- Claude Desktop: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Claude Code: `~/.claude.json`
 
 ### For OpenCode
 
@@ -73,7 +77,7 @@ When you make changes:
 **For MCP server (Claude Code/Desktop):**
 ```bash
 npm run build --workspace=packages/agent-skill
-# Then restart Claude Desktop or re-run the npx command
+# Then restart Claude Desktop and/or Claude Code
 ```
 
 **For OpenCode:**
@@ -89,8 +93,8 @@ npm run build --workspace=packages/agent-skill
 The MCP server (`packages/agent-skill/mcp-server.ts`) implements the Model Context Protocol to expose sift tools to Claude.
 
 When built and configured:
-- **Claude Desktop**: Runs as a local stdio server defined in `claude_desktop_config.json`
-- **Claude Code**: Can be launched via npx or configured in your MCP settings
+- **Claude Desktop**: Runs as a local stdio server defined in `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Claude Code**: Runs as a local stdio server defined in `~/.claude.json`
 
 The server provides five tools that call the `sift` CLI under the hood. It resolves the CLI in this order:
 1. `SIFT_CLI_PATH` environment variable (absolute path to built CLI)
@@ -164,7 +168,20 @@ The `SIFT_CLI_PATH` env var is optional if `sift` is on your PATH.
 
 ### Claude Code
 
-For Claude Code, you can run the MCP server via npx or add it to your MCP configuration. The install script provides the exact command.
+MCP servers are configured globally in `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "sift": {
+      "command": "node",
+      "args": ["/path/to/sift/packages/agent-skill/dist/mcp-server.js"]
+    }
+  }
+}
+```
+
+The `install-agent-claude.sh` script writes this automatically.
 
 ### OpenCode
 
@@ -189,7 +206,19 @@ Build the MCP server:
 npm run build --workspace=packages/agent-skill
 ```
 
-For Claude Desktop, manually add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+For Claude Desktop, add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "sift": {
+      "command": "node",
+      "args": ["/absolute/path/to/sift/packages/agent-skill/dist/mcp-server.js"]
+    }
+  }
+}
+```
+
+For Claude Code, add to `~/.claude.json`:
 ```json
 {
   "mcpServers": {
