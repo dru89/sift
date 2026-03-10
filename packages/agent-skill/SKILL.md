@@ -50,6 +50,17 @@ Tasks use the Obsidian Tasks emoji format:
 - Use `sift_summary` for a quick overview
 - When the user says something like "I need to remember to X" or "add a task to Y", use `sift_add`
 
+## Writing task descriptions
+
+Task descriptions are written into Obsidian markdown files, so use **Obsidian syntax** when appropriate:
+
+- **Use wiki links for vault references.** When a task references a file, note, or page in the vault, use Obsidian's `[[wiki link]]` syntax instead of backticks or markdown links. For example:
+  - "Review the [[Health Tracker/_shortcut-log]] blueprint" -- not `` `Health Tracker/_shortcut-log.md` ``
+  - "Update [[Meeting Notes/2026-03-10]]" -- not `Meeting Notes/2026-03-10.md`
+  - You can drop the `.md` extension in wiki links; Obsidian resolves them automatically.
+- **Use wiki links for people too**, if the user appears to reference people as notes (e.g., `[[John Smith]]`).
+- **Don't overuse wiki links.** Only use them when referencing something that is (or could be) a note in the vault. Generic text, code snippets, and external references should stay as-is.
+
 ## Project-aware task placement
 
 When the user asks you to add a task, consider whether it belongs to an existing project:
