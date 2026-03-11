@@ -153,26 +153,22 @@ const tools: Tool[] = [
   {
     name: "sift_done",
     description:
-      "Mark a task as complete. Supports two modes: (1) search mode — pass 'search' to find and complete by description substring, or (2) precise mode — pass 'file' and 'line' to complete an exact task. Prefer precise mode after using sift_find to identify the task.",
+      "Mark a task as complete by precise file path and line number. IMPORTANT: You MUST call sift_find first, show the user the exact task you found, and get their explicit confirmation BEFORE calling this tool. Never call sift_done in the same turn as sift_find.",
     inputSchema: {
       type: "object",
       properties: {
-        search: {
-          type: "string",
-          description:
-            "Text to search for in task descriptions. Use this OR file+line, not both.",
-        },
         file: {
           type: "string",
           description:
-            "File path (relative to vault root) for precise completion. Must be used with 'line'.",
+            "File path (relative to vault root) from sift_find output.",
         },
         line: {
           type: "number",
           description:
-            "Line number (1-indexed) for precise completion. Must be used with 'file'.",
+            "Line number (1-indexed) from sift_find output.",
         },
       },
+      required: ["file", "line"],
     },
   },
   {
@@ -281,7 +277,7 @@ const tools: Tool[] = [
   {
     name: "sift_mark",
     description:
-      "Mark a task with any status (in_progress, on_hold, moved, cancelled, open, done). Supports two modes: (1) search mode — pass 'search' to find and mark by description, or (2) precise mode — pass 'file' and 'line'. Prefer precise mode after using sift_find.",
+      "Mark a task with any status (in_progress, on_hold, moved, cancelled, open, done) by precise file path and line number. IMPORTANT: You MUST call sift_find first, show the user the exact task you found, and get their explicit confirmation BEFORE calling this tool. Never call sift_mark in the same turn as sift_find.",
     inputSchema: {
       type: "object",
       properties: {
@@ -290,23 +286,18 @@ const tools: Tool[] = [
           enum: ["open", "in_progress", "on_hold", "moved", "cancelled", "done"],
           description: "The new status to set on the task",
         },
-        search: {
-          type: "string",
-          description:
-            "Text to search for in task descriptions. Use this OR file+line, not both.",
-        },
         file: {
           type: "string",
           description:
-            "File path (relative to vault root) for precise targeting. Must be used with 'line'.",
+            "File path (relative to vault root) from sift_find output.",
         },
         line: {
           type: "number",
           description:
-            "Line number (1-indexed) for precise targeting. Must be used with 'file'.",
+            "Line number (1-indexed) from sift_find output.",
         },
       },
-      required: ["status"],
+      required: ["status", "file", "line"],
     },
   },
   {
@@ -414,34 +405,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_done": {
-        // Precise mode: file + line
-        if (args?.file && args?.line) {
-          const result = runSift([
-            "done",
-            "--file", args.file as string,
-            "--line", String(args.line),
-          ]);
+        if (!args?.file || !args?.line) {
           return {
-            content: [{ type: "text", text: result }],
+            content: [
+              {
+                type: "text",
+                text: "Error: both 'file' and 'line' are required. Use sift_find first to get the file path and line number.",
+              },
+            ],
+            isError: true,
           };
         }
-
-        // Search mode
-        if (args?.search) {
-          const result = runSift(["done", args.search as string]);
-          return {
-            content: [{ type: "text", text: result }],
-          };
-        }
-
+        const result = runSift([
+          "done",
+          "--file", args.file as string,
+          "--line", String(args.line),
+        ]);
         return {
-          content: [
-            {
-              type: "text",
-              text: "Error: provide either 'search' or both 'file' and 'line'",
-            },
-          ],
-          isError: true,
+          content: [{ type: "text", text: result }],
         };
       }
 
@@ -496,17 +477,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_mark": {
-        const cliArgs = ["mark", "--status", args?.status as string];
-        if (args?.file && args?.line) {
-          cliArgs.push("--file", args.file as string, "--line", String(args.line));
-        } else if (args?.search) {
-          cliArgs.push(args.search as string);
-        } else {
+        if (!args?.file || !args?.line) {
           return {
-            content: [{ type: "text", text: "Error: provide either 'search' or both 'file' and 'line'" }],
+            content: [{ type: "text", text: "Error: both 'file' and 'line' are required. Use sift_find first to get the file path and line number." }],
             isError: true,
           };
         }
+        const cliArgs = ["mark", "--status", args?.status as string];
+        cliArgs.push("--file", args.file as string, "--line", String(args.line));
         const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],

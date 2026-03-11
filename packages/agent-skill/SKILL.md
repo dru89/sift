@@ -16,7 +16,7 @@ The following custom tools are available for interacting with the user's tasks:
 - **`sift_summary`** - Quick overview: open count, overdue, due today, high priority, and up next
 - **`sift_add`** - Add a new task to today's daily note, or to a specific project
 - **`sift_find`** - Search for actionable tasks without modifying them (use before `sift_done` or `sift_mark`)
-- **`sift_done`** - Mark a task as complete (by search or by precise file+line)
+- **`sift_done`** - Mark a task as complete (requires file+line from `sift_find`; confirm with user first)
 - **`sift_mark`** - Mark a task with any status: `in_progress`, `on_hold`, `moved`, `cancelled`, `open`, or `done` (use `sift_find` first)
 - **`sift_projects`** - List all projects in the vault (with status, tags, created date)
 - **`sift_projectCreate`** - Create a new project from template
@@ -102,8 +102,8 @@ If the task doesn't feel like it belongs to any project, add it to the daily not
 When the user wants to mark a task as done, in progress, on hold, etc.:
 
 1. **Always use `sift_find` first** to search for the task and preview the matches.
-2. **Show the user the exact task** you're about to update (description, file, line number) and confirm before proceeding.
-3. **Use precise mode when possible.** After confirming with the user, pass `file` and `line` to `sift_done` or `sift_mark` instead of `search`. This prevents any ambiguity.
+2. **Show the user the exact task** you're about to update (description, file, line number) and **wait for explicit confirmation before proceeding**. Do NOT call `sift_done` or `sift_mark` in the same response as `sift_find` -- you must wait for the user to reply.
+3. **Use precise mode.** After confirming with the user, pass `file` and `line` to `sift_done` or `sift_mark` (these are the only parameters they accept).
 4. **If multiple tasks match**, show all matches and ask the user to clarify which one they mean.
 5. **Use `sift_done` as a shortcut** when marking complete; use `sift_mark` for any other status change.
 
