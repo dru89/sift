@@ -2,6 +2,13 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { glob } from "glob";
 import { type SiftConfig, type ProjectInfo } from "./types.js";
+import { localToday } from "./dates.js";
+
+/** Return a string value from a frontmatter field, or undefined if blank/array. */
+function scalar(val: unknown): string | undefined {
+  if (typeof val === "string" && val.trim()) return val.trim();
+  return undefined;
+}
 
 /**
  * List all projects in the vault by scanning the projects folder
@@ -38,12 +45,14 @@ export async function listProjects(config: SiftConfig): Promise<ProjectInfo[]> {
     const name = path.basename(file, ".md");
     const filePath = path.join(config.projectsPath, file);
 
+    // Use scalar() to guard against parseFrontmatter returning empty arrays for blank fields
     projects.push({
       name,
       filePath,
-      status: frontmatter.status || undefined,
-      timeframe: frontmatter.timeframe || undefined,
-      tags: Array.isArray(frontmatter.tags) ? frontmatter.tags : undefined,
+      status: scalar(frontmatter.status),
+      timeframe: scalar(frontmatter.timeframe),
+      tags: Array.isArray(frontmatter.tags) && frontmatter.tags.length > 0 ? frontmatter.tags : undefined,
+      created: scalar(frontmatter.created),
     });
   }
 
@@ -103,6 +112,9 @@ export async function createProject(
     content = getDefaultProjectTemplate();
   }
 
+  // Inject today's date as the created field
+  content = injectFrontmatterField(content, "created", localToday());
+
   await fs.writeFile(fullPath, content, "utf-8");
   return filePath;
 }
@@ -117,12 +129,73 @@ function stripTemplaterSyntax(content: string): string {
 }
 
 /**
+ * Inject or replace a frontmatter field in markdown content.
+ * If the field already exists (even if empty), its value is replaced.
+ * If the field doesn't exist, it is appended before the closing `---`.
+ *
+ * Accepts string or string[] values. Arrays are written as inline YAML:
+ * `tags: [tag1, tag2]`. Multi-line list format in existing content is
+ * collapsed to inline on write.
+ */
+function injectFrontmatterField(content: string, key: string, value: string | string[]): string {
+  if (!content.startsWith("---")) return content;
+  const endIdx = content.indexOf("---", 3);
+  if (endIdx === -1) return content;
+
+  const serialized = Array.isArray(value)
+    ? value.length > 0 ? `[${value.join(", ")}]` : ""
+    : value;
+
+  const frontmatter = content.slice(0, endIdx);
+  const rest = content.slice(endIdx);
+
+  // For array fields, also consume any following indented list items (multi-line format)
+  const fieldRegex = Array.isArray(value)
+    ? new RegExp(`^${key}:.*(?:\\n[ \\t]+-.*)*`, "m")
+    : new RegExp(`^${key}:.*$`, "m");
+
+  if (fieldRegex.test(frontmatter)) {
+    return frontmatter.replace(fieldRegex, `${key}: ${serialized}`) + rest;
+  }
+
+  // Field not present — insert before closing ---
+  return frontmatter + `${key}: ${serialized}\n` + rest;
+}
+
+/**
+ * Set a frontmatter field on an existing project file.
+ *
+ * @param config - The sift configuration
+ * @param name - The project name
+ * @param key - The frontmatter key to set (e.g. "status")
+ * @param value - The value to set
+ * @throws If the project is not found
+ */
+export async function setProjectField(
+  config: SiftConfig,
+  name: string,
+  key: string,
+  value: string | string[],
+): Promise<void> {
+  const project = await findProject(config, name);
+  if (!project) {
+    throw new Error(`Project "${name}" not found`);
+  }
+
+  const fullPath = path.join(config.vaultPath, project.filePath);
+  const content = await fs.readFile(fullPath, "utf-8");
+  const updated = injectFrontmatterField(content, key, value);
+  await fs.writeFile(fullPath, updated, "utf-8");
+}
+
+/**
  * Default project template used when no template file is configured or found.
  */
 function getDefaultProjectTemplate(): string {
   return `---
 type: project
 status:
+created:
 timeframe:
 teams:
 collaborators:

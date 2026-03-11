@@ -177,6 +177,7 @@ The review shows:
 - **Completed** -- tasks with a `✅` date in the review period
 - **Created & still open** -- tasks with a `➕` date in the period
 - **Project notes** -- changelog entries from project files
+- **New notes** -- non-task vault files (meetings, weblinks, etc.) with a `created` or `date` frontmatter field in the period, grouped by type
 - **Stale** -- open tasks with no due or scheduled date
 - **Upcoming** -- tasks due in the 7 days after the review period
 
@@ -185,16 +186,36 @@ The review shows:
 List all projects in the vault.
 
 ```bash
-sift projects
+sift projects                 # all projects
+sift projects --tag vibecode  # filter by tag
 ```
+
+Active and planning projects are shown at full brightness; someday and done projects are dimmed.
 
 ### `sift project create`
 
-Create a new project from the configured template.
+Create a new project from the configured template. The `created` date is automatically set to today.
 
 ```bash
 sift project create "My New Project"
 ```
+
+### `sift project set`
+
+Update frontmatter fields on a project.
+
+```bash
+sift project set "My Project" --status active
+sift project set "My Project" --status someday
+sift project set "My Project" --tags ai tooling
+sift project set "My Project" --status planning --timeframe "Q2 2026" --tags ai
+```
+
+| Flag | Description |
+|------|-------------|
+| `--status <status>` | `active`, `planning`, `someday`, or `done` |
+| `--timeframe <timeframe>` | Planning horizon (e.g. `Q2 2026`) |
+| `--tags <tags...>` | Tag list, space-separated (replaces existing tags) |
 
 ### `sift project path`
 

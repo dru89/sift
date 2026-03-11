@@ -12,17 +12,18 @@ Sift supports two integration approaches:
 All integrations provide these core tools:
 - `sift_list` - List and filter tasks
 - `sift_next` - Get priority tasks
-- `sift_summary` - Quick status overview
+- `sift_summary` - Quick status overview (includes project list)
 - `sift_add` - Add new tasks (to daily note or project)
 - `sift_find` - Search tasks without modifying them
 - `sift_done` - Complete tasks (by search or precise file:line)
-- `sift_projects` - List vault projects
+- `sift_projects` - List vault projects (supports `--tag` filter)
 - `sift_project_create` / `sift_projectCreate` - Create a new project
 - `sift_project_path` / `sift_projectPath` - Get a project's file path
+- `sift_project_set` / `sift_projectSet` - Update project metadata (status, timeframe, tags)
 - `sift_note` / `sift_addNote` - Add freeform notes
-- `sift_review` / `sift_review` - Generate a review summary
+- `sift_review` - Generate a review summary (completed, created, new notes, stale, changelog, upcoming)
 
-Note: Tool names use underscores in MCP (e.g., `sift_project_create`) and camelCase in OpenCode (e.g., `sift_projectCreate`).
+Note: Tool names use underscores in MCP (e.g., `sift_project_set`) and camelCase in OpenCode (e.g., `sift_projectSet`).
 
 ## Quick setup
 
@@ -130,15 +131,16 @@ The tools file (`sift.ts`) defines OpenCode custom tools that call the `sift` CL
 |-----------|-------------|
 | `sift_list` | List open tasks, with optional search/priority/date filters |
 | `sift_next` | Get the most important tasks sorted by urgency |
-| `sift_summary` | Quick overview of task status |
+| `sift_summary` | Quick overview of task status + active projects |
 | `sift_add` | Add a new task to today's daily note or a project |
 | `sift_find` | Search tasks without modifying them |
 | `sift_done` | Mark a task as complete (by search or by file:line) |
-| `sift_projects` | List all projects in the vault |
+| `sift_projects` | List all projects in the vault (optional `tag` filter) |
 | `sift_projectCreate` | Create a new project from template |
 | `sift_projectPath` | Get the file path for a project |
+| `sift_projectSet` | Update project metadata: status, timeframe, tags |
 | `sift_addNote` | Add a freeform note to daily note or project |
-| `sift_review` | Generate a review summary (completed, created, stale, changelog, upcoming) |
+| `sift_review` | Generate a review summary (completed, created, new notes, stale, changelog, upcoming) |
 
 The tools resolve the CLI in this order:
 1. `SIFT_CLI_PATH` environment variable (absolute path to the built CLI entry point)

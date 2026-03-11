@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { glob } from "glob";
 import { parseContent } from "./parser.js";
 import { localToday, addDays, previousDayOfWeek } from "./dates.js";
-import { type Task, type TaskFilter, type SiftConfig, type Priority, type ChangelogEntry, type ReviewSummary } from "./types.js";
+import { type Task, type TaskFilter, type SiftConfig, type Priority, type ChangelogEntry, type VaultFile, type ReviewSummary } from "./types.js";
 
 /**
  * Priority ordering for comparison. Lower number = higher priority.
@@ -252,6 +252,84 @@ export async function scanChangelog(
 }
 
 /**
+ * Extract a simple frontmatter field value from markdown content.
+ * Returns the string value for a given key, or undefined if not found/blank.
+ */
+function extractFrontmatterField(content: string, key: string): string | undefined {
+  if (!content.startsWith("---")) return undefined;
+  const endIdx = content.indexOf("---", 3);
+  if (endIdx === -1) return undefined;
+  const yaml = content.slice(3, endIdx);
+  const regex = new RegExp(`^${key}:\\s*(.+)$`, "m");
+  const match = yaml.match(regex);
+  if (!match) return undefined;
+  const value = match[1].trim().replace(/^["']|["']$/g, "");
+  return value || undefined;
+}
+
+/**
+ * Scan the vault for non-task files (meetings, weblinks, etc.) that have a
+ * `created:` or `date:` frontmatter field within the given date range.
+ *
+ * Skips: daily notes folder, projects folder, and any excludeFolders.
+ * Groups results by the `type` frontmatter field, or the top-level folder.
+ */
+export async function scanVaultFiles(
+  config: SiftConfig,
+  since: string,
+  until: string,
+): Promise<VaultFile[]> {
+  const { vaultPath, dailyNotesPath, projectsPath, excludeFolders } = config;
+
+  const skipFolders = new Set([
+    ...excludeFolders,
+    dailyNotesPath,
+    projectsPath,
+  ]);
+
+  const allFiles = await glob("**/*.md", {
+    cwd: vaultPath,
+    ignore: [...skipFolders].map((f) => `${f}/**`),
+    absolute: false,
+  });
+
+  const results: VaultFile[] = [];
+
+  for (const file of allFiles) {
+    // Skip root-level files
+    if (!file.includes("/")) continue;
+
+    const fullPath = path.join(vaultPath, file);
+    const content = await fs.readFile(fullPath, "utf-8");
+    if (!content.startsWith("---")) continue;
+
+    // Use 'created' if present, fall back to 'date'
+    const dateValue =
+      extractFrontmatterField(content, "created") ??
+      extractFrontmatterField(content, "date");
+
+    if (!dateValue || !dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
+    if (dateValue < since || dateValue > until) continue;
+
+    // Determine category: prefer 'type' frontmatter field, fall back to top-level folder
+    const typeField = extractFrontmatterField(content, "type");
+    const topFolder = file.split("/")[0];
+    const category = typeField && typeField !== "project" ? typeField : topFolder;
+
+    results.push({
+      filePath: file,
+      name: path.basename(file, ".md"),
+      category,
+      date: dateValue,
+    });
+  }
+
+  // Sort by date descending, then name
+  results.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+  return results;
+}
+
+/**
  * Generate a review summary for a given period.
  *
  * @param config - The sift configuration
@@ -307,6 +385,9 @@ export async function getReviewSummary(
   // Changelog entries from project files
   const changelog = await scanChangelog(config, effectiveSince, effectiveUntil);
 
+  // Non-task vault files dated within the period
+  const newFiles = await scanVaultFiles(config, effectiveSince, effectiveUntil);
+
   // Upcoming: tasks due in the 7 days after the period
   const upcomingEnd = addDays(effectiveUntil, 7);
   const upcoming = sortByUrgency(
@@ -326,6 +407,7 @@ export async function getReviewSummary(
     created,
     stale,
     changelog,
+    newFiles,
     upcoming,
   };
 }

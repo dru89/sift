@@ -181,7 +181,12 @@ const tools: Tool[] = [
       "List all projects in the vault. Returns project names, statuses, and tags.",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        tag: {
+          type: "string",
+          description: "Filter to only show projects with this tag",
+        },
+      },
     },
   },
   {
@@ -237,6 +242,35 @@ const tools: Tool[] = [
         },
       },
       required: ["content"],
+    },
+  },
+  {
+    name: "sift_project_set",
+    description:
+      "Update frontmatter fields on a project (status, timeframe, tags). Use this to change a project's status (active, planning, someday, done), timeframe, or tags.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "The project name",
+        },
+        status: {
+          type: "string",
+          enum: ["active", "planning", "someday", "done"],
+          description: "New project status",
+        },
+        timeframe: {
+          type: "string",
+          description: "New project timeframe (e.g. 'Q2 2026')",
+        },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "New tag list (replaces existing tags)",
+        },
+      },
+      required: ["name"],
     },
   },
   {
@@ -376,7 +410,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_projects": {
-        const result = runSift(["projects"]);
+        const cliArgs = ["projects"];
+        if (args?.tag) cliArgs.push("--tag", args.tag as string);
+        const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],
         };
@@ -402,6 +438,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           cliArgs.push("--project", args.project as string);
         if (args?.heading)
           cliArgs.push("--heading", args.heading as string);
+        const result = runSift(cliArgs);
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      }
+
+      case "sift_project_set": {
+        const cliArgs = ["project", "set", args?.name as string];
+        if (args?.status) cliArgs.push("--status", args.status as string);
+        if (args?.timeframe) cliArgs.push("--timeframe", args.timeframe as string);
+        if (args?.tags && Array.isArray(args.tags) && args.tags.length > 0) {
+          cliArgs.push("--tags", ...(args.tags as string[]));
+        }
         const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],

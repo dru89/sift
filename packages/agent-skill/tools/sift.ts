@@ -195,9 +195,16 @@ export const done = tool({
 export const projects = tool({
   description:
     "List all projects in the vault. Returns project names, statuses, and tags.",
-  args: {},
-  async execute() {
-    return runSift(["projects"]);
+  args: {
+    tag: tool.schema
+      .string()
+      .optional()
+      .describe("Filter to only show projects with this tag"),
+  },
+  async execute(args) {
+    const cliArgs = ["projects"];
+    if (args.tag) cliArgs.push("--tag", args.tag);
+    return runSift(cliArgs);
   },
 });
 
@@ -250,6 +257,33 @@ export const addNote = tool({
     const cliArgs = ["note", args.content];
     if (args.project) cliArgs.push("--project", args.project);
     if (args.heading) cliArgs.push("--heading", args.heading);
+    return runSift(cliArgs);
+  },
+});
+
+export const projectSet = tool({
+  description:
+    "Update frontmatter fields on a project (status, timeframe, tags). Use this to change a project's status (active, planning, someday, done), timeframe, or tags.",
+  args: {
+    name: tool.schema.string().describe("The project name"),
+    status: tool.schema
+      .enum(["active", "planning", "someday", "done"])
+      .optional()
+      .describe("New project status"),
+    timeframe: tool.schema
+      .string()
+      .optional()
+      .describe("New project timeframe (e.g. 'Q2 2026')"),
+    tags: tool.schema
+      .array(tool.schema.string())
+      .optional()
+      .describe("New tag list (replaces existing tags)"),
+  },
+  async execute(args) {
+    const cliArgs = ["project", "set", args.name];
+    if (args.status) cliArgs.push("--status", args.status);
+    if (args.timeframe) cliArgs.push("--timeframe", args.timeframe);
+    if (args.tags && args.tags.length > 0) cliArgs.push("--tags", ...args.tags);
     return runSift(cliArgs);
   },
 });

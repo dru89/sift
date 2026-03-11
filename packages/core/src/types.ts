@@ -95,6 +95,12 @@ export interface SiftConfig {
 }
 
 /**
+ * Valid project status values.
+ * Blank/missing status is treated as "active" by default.
+ */
+export type ProjectStatus = "active" | "planning" | "someday" | "done";
+
+/**
  * Metadata about a project in the vault.
  */
 export interface ProjectInfo {
@@ -112,6 +118,9 @@ export interface ProjectInfo {
 
   /** Frontmatter tags, if present */
   tags?: string[];
+
+  /** Frontmatter created date (YYYY-MM-DD), if present */
+  created?: string;
 }
 
 /**
@@ -159,6 +168,27 @@ export interface ChangelogEntry {
 }
 
 /**
+ * A non-task vault file (meeting note, weblink, clip, etc.) that was
+ * created/dated within a review period.
+ */
+export interface VaultFile {
+  /** Path to the file, relative to vault root */
+  filePath: string;
+
+  /** The file name without extension */
+  name: string;
+
+  /**
+   * Category for grouping — the `type` frontmatter field if present
+   * (e.g. "meeting", "weblink"), otherwise the top-level folder name.
+   */
+  category: string;
+
+  /** The date this file was created/dated (YYYY-MM-DD) */
+  date: string;
+}
+
+/**
  * A weekly (or custom period) review summary.
  */
 export interface ReviewSummary {
@@ -179,6 +209,9 @@ export interface ReviewSummary {
 
   /** Changelog entries from project files during the period */
   changelog: ChangelogEntry[];
+
+  /** Non-task vault files (meetings, weblinks, etc.) dated within the period */
+  newFiles: VaultFile[];
 
   /** Tasks due in the 7 days after the review period */
   upcoming: Task[];

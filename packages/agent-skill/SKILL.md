@@ -17,9 +17,10 @@ The following custom tools are available for interacting with the user's tasks:
 - **`sift_add`** - Add a new task to today's daily note, or to a specific project
 - **`sift_find`** - Search for open tasks without modifying them (use before `sift_done`)
 - **`sift_done`** - Mark a task as complete (by search or by precise file+line)
-- **`sift_projects`** - List all projects in the vault
+- **`sift_projects`** - List all projects in the vault (with status, tags, created date)
 - **`sift_projectCreate`** - Create a new project from template
 - **`sift_projectPath`** - Get the vault-relative file path for a project (for reading/editing)
+- **`sift_project_set`** - Update project frontmatter: `--status` and/or `--timeframe`
 - **`sift_addNote`** - Add a freeform note to a daily note or project file
 - **`sift_review`** - Generate a review summary (completed, created, stale, changelog, upcoming)
 
@@ -96,7 +97,26 @@ Example flow:
 
 ## Creating projects
 
-When the user wants to create a new project, use `sift_projectCreate` with the project name. This creates a new file from the vault's project template in the Projects folder.
+When the user wants to create a new project, use `sift_projectCreate` with the project name. This creates a new file from the vault's project template in the Projects folder, with `created` set to today's date automatically.
+
+## Project statuses
+
+Projects use a standard status vocabulary. Use `sift_project_set` to change a project's status:
+
+| Status | Meaning |
+|--------|---------|
+| `active` | Currently being worked on (this is the default when no status is set) |
+| `planning` | Upcoming — scoping or design phase, not yet in execution |
+| `someday` | Low priority, no timeline — maybe later (GTD "someday/maybe") |
+| `done` | Completed |
+
+**When to update status:**
+- Mark a project `done` when the work is finished
+- Move to `someday` when the user explicitly deprioritizes something with no near-term timeline
+- Use `planning` for projects that are defined but not yet started
+- `active` is the right state for anything currently in flight
+
+In `sift summary` and `sift projects`, `active` and `planning` projects appear at full brightness; `someday` and `done` are dimmed.
 
 ## Adding notes to projects and daily notes
 
@@ -117,12 +137,18 @@ Use `sift_addNote` to add freeform content (not tasks) to a project or daily not
 
 ## Reading and editing project files
 
-Use `sift_projectPath` to get the vault-relative file path for any project. This lets you:
-- Read the project file to understand its current state
+When the user asks you to "check out" a project, look at project notes, or references a specific project by name, use the sift tools to find and read it:
+
+1. Use `sift_projects` to list all projects (to confirm the project name if needed)
+2. Use `sift_projectPath` to get the vault-relative file path for the project
+3. Use `sift_summary` to get the vault path, then prepend it to the project path to read the file
+
+This lets you:
+- Read the project file to understand its current state, goals, and notes
 - Make direct edits to any section of the project
 - Check what tasks, notes, or goals already exist
 
-The returned path is relative to the vault root. To get the absolute path for file operations, prepend the vault path from the sift configuration.
+The path returned by `sift_projectPath` is relative to the vault root. To get the absolute path for file operations, prepend the vault path from the sift configuration (visible in `sift_summary` output).
 
 ## Date handling for new tasks
 
@@ -172,8 +198,7 @@ This happens automatically -- you don't need to do anything special. The changel
 
 **Notes about changelog:**
 - Only notes create changelog entries, not tasks (tasks already have `➕` created dates)
-- The summary is auto-generated from the first ~80 characters of the note content
-- You can pass an explicit `changelogSummary` via the CLI if you want a custom summary
+- Always pass a `changelogSummary` when calling `sift_addNote` — write a short, meaningful one-liner that captures the essence of the note (e.g. "Decided to use ID3v2.4 format", "Switched auth strategy to JWT"). Don't rely on the default, which just truncates the raw note content.
 
 ## CWD project context
 

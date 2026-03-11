@@ -200,11 +200,28 @@ Freeform notes (not tasks) can be added with `sift note`. By default, notes go u
 
 ### Review
 
-`sift review` generates a summary of activity over a time period: tasks completed, tasks created (still open), project changelog entries, stale tasks, and upcoming tasks. Defaults to since last Friday (designed for weekly reviews). Use `--since <date>`, `--days <N>`, or `--until <date>` for custom periods.
+`sift review` generates a summary of activity over a time period: tasks completed, tasks created (still open), project changelog entries, new vault notes (meetings, weblinks, etc.), stale tasks, and upcoming tasks. Defaults to since last Friday (designed for weekly reviews). Use `--since <date>`, `--days <N>`, or `--until <date>` for custom periods.
 
 ### Projects
 
-Projects are markdown files in the configured `projectsPath` folder (default: `Projects/`) with `type: project` in their YAML frontmatter. Use `sift projects` to list them, `sift project create` to create new ones from a template, and `sift project path` to get the file path for a project.
+Projects are markdown files in the configured `projectsPath` folder (default: `Projects/`) with `type: project` in their YAML frontmatter. Each project tracks a standard set of metadata:
+
+| Field | Description |
+|-------|-------------|
+| `status` | `active` (default), `planning`, `someday`, or `done` |
+| `created` | Date the project was created (set automatically by `sift project create`) |
+| `timeframe` | Optional planning horizon (e.g. `Q2 2026`) |
+| `tags` | Optional list of tags |
+
+```bash
+sift projects                       # list all projects
+sift projects --tag vibecode        # filter by tag
+sift project create "My Project"    # create from template
+sift project set "My Project" --status active --tags ai tooling
+sift project path "My Project"      # get vault-relative file path
+```
+
+`sift summary` shows a projects section with active/planning projects at full brightness and someday/done projects dimmed.
 
 ## Project structure
 

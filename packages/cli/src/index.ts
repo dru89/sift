@@ -19,6 +19,7 @@ import {
   listProjects,
   findProject,
   createProject,
+  setProjectField,
   localToday,
   addDays,
   previousDayOfWeek,
@@ -243,18 +244,32 @@ program
 program
   .command("projects")
   .description("List projects in the vault")
-  .action(async () => {
+  .option("--tag <tag>", "Filter to projects with this tag")
+  .action(async (opts) => {
     const config = await resolveConfig();
-    const projects = await listProjects(config);
+    let projects = await listProjects(config);
+
+    if (opts.tag) {
+      const tagLower = opts.tag.toLowerCase();
+      projects = projects.filter((p) =>
+        p.tags?.some((t) => t.toLowerCase() === tagLower),
+      );
+    }
 
     if (projects.length === 0) {
-      console.log(chalk.dim("No projects found in ") + config.projectsPath);
+      const msg = opts.tag
+        ? `No projects found with tag #${opts.tag}`
+        : `No projects found in ${config.projectsPath}`;
+      console.log(chalk.dim(msg));
       return;
     }
 
     console.log(chalk.bold("Projects"));
     for (const project of projects) {
-      const parts: string[] = [chalk.white(project.name)];
+      const effectiveStatus = project.status || "active";
+      const inactive = effectiveStatus === "someday" || effectiveStatus === "done";
+      const nameStr = inactive ? chalk.dim(project.name) : chalk.white(project.name);
+      const parts: string[] = [nameStr];
       if (project.status) {
         parts.push(chalk.dim(`(${project.status})`));
       }
@@ -262,7 +277,11 @@ program
         parts.push(chalk.dim(`[${project.timeframe}]`));
       }
       if (project.tags && project.tags.length > 0) {
-        parts.push(chalk.cyan(project.tags.map((t) => `#${t}`).join(" ")));
+        const tagStr = project.tags.map((t) => `#${t}`).join(" ");
+        parts.push(inactive ? chalk.dim(tagStr) : chalk.cyan(tagStr));
+      }
+      if (project.created) {
+        parts.push(chalk.dim(project.created));
       }
       console.log("  " + parts.join("  "));
     }
@@ -308,6 +327,38 @@ projectCmd
       console.log(path.join(config.vaultPath, project.filePath));
     } else {
       console.log(project.filePath);
+    }
+  });
+
+// ─── sift project set ────────────────────────────────────────
+projectCmd
+  .command("set <name...>")
+  .description("Update project frontmatter fields")
+  .option("--status <status>", "Set project status (active, planning, someday, done)")
+  .option("--timeframe <timeframe>", "Set project timeframe")
+  .option("--tags <tags...>", "Set project tags (space-separated, replaces existing tags)")
+  .action(async (nameParts: string[], opts) => {
+    const config = await resolveConfig();
+    const name = nameParts.join(" ");
+
+    const hasChanges = opts.status || opts.timeframe || opts.tags;
+    if (!hasChanges) {
+      console.error(chalk.red("Error: ") + "Specify at least one field to set (e.g. --status active)");
+      process.exit(1);
+    }
+
+    try {
+      if (opts.status) await setProjectField(config, name, "status", opts.status);
+      if (opts.timeframe) await setProjectField(config, name, "timeframe", opts.timeframe);
+      if (opts.tags) await setProjectField(config, name, "tags", opts.tags as string[]);
+
+      console.log(chalk.green("✓") + ` Updated project "${name}"`);
+      if (opts.status) console.log(chalk.dim("  status: ") + opts.status);
+      if (opts.timeframe) console.log(chalk.dim("  timeframe: ") + opts.timeframe);
+      if (opts.tags) console.log(chalk.dim("  tags: ") + (opts.tags as string[]).map((t: string) => `#${t}`).join(" "));
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
     }
   });
 
@@ -368,6 +419,25 @@ program
       console.log(chalk.bold.magenta(`📝 Project notes (${review.changelog.length})`));
       for (const entry of review.changelog) {
         console.log(`  ${chalk.dim(entry.date)}  ${chalk.white(entry.project)}  ${entry.summary}`);
+      }
+      console.log();
+    }
+
+    // New vault files (meetings, weblinks, etc.)
+    if (review.newFiles.length > 0) {
+      // Group by category
+      const byCategory = new Map<string, typeof review.newFiles>();
+      for (const file of review.newFiles) {
+        const group = byCategory.get(file.category) ?? [];
+        group.push(file);
+        byCategory.set(file.category, group);
+      }
+      console.log(chalk.bold.blue(`📄 New notes (${review.newFiles.length})`));
+      for (const [category, files] of byCategory) {
+        console.log(`  ${chalk.dim(category)}  ${chalk.dim(`(${files.length})`)}`);
+        for (const file of files) {
+          console.log(`    ${chalk.dim(file.date)}  ${file.name}`);
+        }
       }
       console.log();
     }
@@ -460,6 +530,31 @@ program
 
     const next = sortByUrgency(openTasks).slice(0, 5);
     console.log(formatTaskList(next, "👉 Up Next"));
+
+    // Projects section
+    const projects = await listProjects(config);
+    if (projects.length > 0) {
+      console.log();
+      const activeStatuses = new Set(["active", "planning"]);
+      const active = projects.filter((p) => activeStatuses.has(p.status || "active"));
+      const inactive = projects.filter((p) => !activeStatuses.has(p.status || "active"));
+
+      const countStr = [
+        chalk.white(`${active.length} active`),
+        inactive.length > 0 ? chalk.dim(`${inactive.length} inactive`) : "",
+      ].filter(Boolean).join(chalk.dim("  ·  "));
+
+      console.log(chalk.bold("📁 Projects") + "  " + countStr);
+      for (const project of active) {
+        const status = project.status ? chalk.dim(` (${project.status})`) : "";
+        const tags = project.tags?.length ? chalk.dim("  " + project.tags.map((t) => `#${t}`).join(" ")) : "";
+        console.log("  " + chalk.white(project.name) + status + tags);
+      }
+      for (const project of inactive) {
+        const status = project.status ? chalk.dim(` (${project.status})`) : "";
+        console.log("  " + chalk.dim(project.name + status));
+      }
+    }
 
     // Show CWD project context if configured
     if (config.project) {
