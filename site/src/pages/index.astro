@@ -1,0 +1,604 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Header from '../components/Header.astro'
+import Footer from '../components/Footer.astro'
+
+const repoUrl = 'https://github.com/Dru89/sift'
+
+const heroCode = `$ sift summary
+📋 Sift Summary
+
+12 open  ·  24 done  ·  2 overdue  ·  3 due today
+
+🔴 Overdue
+  ○ ⏫ Write the quarterly report  due 2026-03-09
+  ○ 🔼 Review the architecture doc  due 2026-03-09
+
+📅 Due Today
+  ○ 🔼 Book travel for the team offsite  due 2026-03-10
+  ○   Weekly standup notes  due 2026-03-10
+
+👉 Up Next
+  ○ ⏫ Write the quarterly report  due 2026-03-09
+  ○ 🔼 Review the architecture doc  due 2026-03-09
+  ○ 🔼 Book travel for the team offsite  due 2026-03-10
+  ○   Prepare the demo slides  scheduled 2026-03-11
+  ○   Read the API design proposal  due 2026-03-15`
+
+const projectsCode = `$ sift projects
+Projects
+  Website Redesign  (active)  [Q1]
+  Health Tracker  (planning)  #personal
+  Blog Post  (active)  [March]
+
+$ sift add "Design the API" --project "Website Redesign"
+✓ Added task to project "Website Redesign":
+  - [ ] Design the API ➕ 2026-03-10`
+
+const nextCode = `$ sift next -n 5
+Next 5 tasks
+  ○ ⏫ Write the quarterly report  due 2026-03-09
+  ○ 🔼 Book travel for offsite  due 2026-03-10
+  ○ 🔼 Review the architecture doc  due 2026-03-12
+  ○   Prepare the demo slides  scheduled 2026-03-11
+  ○   Read the API design proposal  due 2026-03-15`
+
+const noteCode = `$ sift note "Decided to go with REST over GraphQL"
+✓ Added note to today's daily note under ## Journal
+
+$ sift note --project "Website Redesign" \\
+    --heading "## Decisions" \\
+    "Use REST for the public API, GraphQL for internal"
+✓ Added note to project "Website Redesign" under ## Decisions`
+
+const findCode = `$ sift find "report"
+Found 2 tasks
+  ○ ⏫ Write the quarterly report  [Daily Notes/2026-03-10.md:13]
+  ○   Read the annual report  [Daily Notes/2026-03-08.md:15]
+
+$ sift done --file "Daily Notes/2026-03-10.md" --line 13
+✓ Completed: Write the quarterly report ⏫ 📅 2026-03-09`
+---
+
+<Layout title="sift — Manage Obsidian Tasks from anywhere">
+  <Header currentPath="/" />
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <!-- <img src="/sift-icon.png" alt="sift icon" class="hero-icon" /> -->
+        <h1 class="hero-title">Your Obsidian tasks,<br />everywhere.</h1>
+        <p class="hero-subtitle">
+          Surface and manage your <a href="https://publish.obsidian.md/tasks/">Obsidian Tasks</a> from the terminal,
+          Raycast, or an AI agent — without ever opening Obsidian.
+        </p>
+        <div class="hero-actions">
+          <a href="/getting-started/" class="btn btn-primary">Get Started</a>
+          <a href={repoUrl} class="btn btn-secondary">View on GitHub</a>
+        </div>
+        <div class="hero-screenshot">
+          <!-- Replace with <img src="/cli-summary.png" /> once captured -->
+          <div class="screenshot-placeholder">
+            <pre>{heroCode}</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="interfaces">
+      <div class="container">
+        <h2 class="section-title">One vault, three interfaces</h2>
+        <p class="section-subtitle">
+          All interfaces share the same <code>@sift/core</code> library, so they always behave consistently.
+          Use whichever fits your workflow — or all of them.
+        </p>
+
+        <div class="interface-grid">
+          <div class="interface-card">
+            <div class="interface-label">Terminal</div>
+            <h3>Command-line interface</h3>
+            <p>
+              Fast, scriptable access to everything. List tasks, check priorities, add new tasks,
+              mark things done, manage projects — all from your terminal.
+            </p>
+            <div class="interface-commands">
+              <code>sift summary</code>
+              <code>sift next</code>
+              <code>sift add</code>
+              <code>sift done</code>
+              <code>sift note</code>
+            </div>
+            <a href="/cli/" class="interface-link">CLI reference →</a>
+          </div>
+
+          <div class="interface-card">
+            <div class="interface-label">Raycast</div>
+            <h3>Raycast extension</h3>
+            <p>
+              A native Raycast extension for macOS. Search tasks, view priorities,
+              add tasks with a form, and mark things done — all without leaving your keyboard.
+            </p>
+            <div class="interface-commands">
+              <code>Task Summary</code>
+              <code>List Tasks</code>
+              <code>Add Task</code>
+              <code>Up Next</code>
+            </div>
+          </div>
+
+          <div class="interface-card">
+            <div class="interface-label">AI Agent</div>
+            <h3>Agent integration</h3>
+            <p>
+              Works with Claude Code, Claude Desktop, and OpenCode. Ask your AI assistant
+              about your tasks, add new ones, and manage projects conversationally.
+            </p>
+            <div class="interface-commands">
+              <code>"What should I work on?"</code>
+              <code>"Add a task to..."</code>
+              <code>"Mark it done"</code>
+            </div>
+            <a href="/agents/" class="interface-link">Agent setup →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="container">
+        <h2 class="section-title">Built for how you actually work</h2>
+
+        <div class="feature">
+          <div class="feature-text">
+            <h3>Project management</h3>
+            <p>
+              Organize tasks into projects. Add tasks directly to project files,
+              take notes under any heading, and create new projects from templates.
+              Projects are just markdown files with frontmatter — nothing proprietary.
+            </p>
+          </div>
+          <div class="feature-visual">
+            <!-- Replace with cli-projects.png or a combined screenshot -->
+            <div class="screenshot-placeholder screenshot-placeholder-small">
+              <pre>{projectsCode}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature feature-reverse">
+          <div class="feature-text">
+            <h3>Smart prioritization</h3>
+            <p>
+              Sift understands Obsidian Tasks emoji format — priorities, due dates, scheduled dates,
+              recurrence rules. It sorts by urgency so you always know what to work on next.
+            </p>
+          </div>
+          <div class="feature-visual">
+            <!-- Replace with cli-next.png -->
+            <div class="screenshot-placeholder screenshot-placeholder-small">
+              <pre>{nextCode}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature">
+          <div class="feature-text">
+            <h3>Notes, not just tasks</h3>
+            <p>
+              Capture decisions, observations, and context alongside your tasks.
+              Add notes to today's daily note or to any project — under any heading you want.
+            </p>
+          </div>
+          <div class="feature-visual">
+            <!-- Replace with cli-note.png -->
+            <div class="screenshot-placeholder screenshot-placeholder-small">
+              <pre>{noteCode}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature feature-reverse">
+          <div class="feature-text">
+            <h3>Safe task completion</h3>
+            <p>
+              Sift uses a two-step find-then-complete flow to prevent accidentally marking the wrong task.
+              Search first, confirm the match, then complete by exact file and line number.
+            </p>
+          </div>
+          <div class="feature-visual">
+            <!-- Replace with cli-done.png -->
+            <div class="screenshot-placeholder screenshot-placeholder-small">
+              <pre>{findCode}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="extras">
+      <div class="container">
+        <h2 class="section-title">And more</h2>
+        <div class="extras-grid">
+          <div class="extra">
+            <h4>Emoji format</h4>
+            <p>Reads and writes the standard Obsidian Tasks emoji format. Priorities, dates, recurrence — all supported.</p>
+          </div>
+          <div class="extra">
+            <h4>Daily notes</h4>
+            <p>Tasks are added to today's daily note. If it doesn't exist yet, sift creates it from a template.</p>
+          </div>
+          <div class="extra">
+            <h4>Configurable</h4>
+            <p>Point sift at any vault. Configure daily notes path, project folder, excluded directories, and more.</p>
+          </div>
+          <div class="extra">
+            <h4>Fast scanning</h4>
+            <p>Walks your entire vault in milliseconds. Parses every markdown file for tasks and returns structured data.</p>
+          </div>
+          <div class="extra">
+            <h4>Shared core</h4>
+            <p>All interfaces use the same <code>@sift/core</code> library. Add a task from the CLI, see it in Raycast.</p>
+          </div>
+          <div class="extra">
+            <h4>Open source</h4>
+            <p>MIT licensed. Built with TypeScript. Contributions welcome.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div class="container">
+        <h2>Ready to start?</h2>
+        <p>Set up sift in under a minute and start managing your tasks from anywhere.</p>
+        <div class="hero-actions">
+          <a href="/getting-started/" class="btn btn-primary">Get Started</a>
+          <a href={repoUrl} class="btn btn-secondary">View on GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</Layout>
+
+<style>
+  /* Container */
+  .container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Hero */
+  .hero {
+    padding: 80px 0 40px;
+    text-align: center;
+  }
+
+  .hero-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    margin-bottom: 20px;
+  }
+
+  .hero-title {
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    margin-bottom: 16px;
+  }
+
+  .hero-subtitle {
+    font-size: 18px;
+    color: var(--color-text-secondary);
+    max-width: 580px;
+    margin: 0 auto 32px;
+    line-height: 1.6;
+  }
+
+  .hero-subtitle a {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 48px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--color-accent);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--color-accent-hover);
+  }
+
+  .btn-secondary {
+    background: var(--color-bg-alt);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-bg-code);
+  }
+
+  .hero-screenshot {
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  .hero-screenshot img {
+    width: 100%;
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .hero-screenshot img {
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+  }
+
+  /* Screenshot placeholders (until real screenshots are added) */
+  .screenshot-placeholder {
+    background: var(--color-bg-code);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: left;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  }
+
+  .screenshot-placeholder-small {
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .screenshot-placeholder {
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    .screenshot-placeholder-small {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+  }
+
+  .screenshot-placeholder pre {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* Interfaces section */
+  .interfaces {
+    padding: 80px 0;
+    background: var(--color-bg-alt);
+  }
+
+  .section-title {
+    font-size: 32px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+
+  .section-subtitle {
+    font-size: 16px;
+    color: var(--color-text-secondary);
+    text-align: center;
+    max-width: 560px;
+    margin: 0 auto 48px;
+    line-height: 1.6;
+  }
+
+  .interface-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .interface-card {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 28px;
+  }
+
+  .interface-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-accent);
+    margin-bottom: 8px;
+  }
+
+  .interface-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .interface-card p {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+
+  .interface-commands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .interface-commands code {
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--color-bg-code);
+    white-space: nowrap;
+  }
+
+  .interface-link {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+
+  .interface-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* Features */
+  .features {
+    padding: 80px 0;
+  }
+
+  .features .section-title {
+    margin-bottom: 56px;
+  }
+
+  .feature {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 40px;
+    align-items: center;
+    margin-bottom: 64px;
+  }
+
+  .feature-reverse {
+    grid-template-columns: 1.4fr 1fr;
+  }
+
+  .feature-reverse .feature-text {
+    order: 2;
+  }
+
+  .feature h3 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .feature p {
+    font-size: 15px;
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+  }
+
+  /* Extras */
+  .extras {
+    padding: 80px 0;
+    background: var(--color-bg-alt);
+  }
+
+  .extras .section-title {
+    margin-bottom: 40px;
+  }
+
+  .extras-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .extra {
+    padding: 24px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+  }
+
+  .extra h4 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .extra p {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+
+  /* CTA */
+  .cta {
+    padding: 80px 0;
+    text-align: center;
+  }
+
+  .cta h2 {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .cta p {
+    font-size: 16px;
+    color: var(--color-text-secondary);
+    margin-bottom: 24px;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero-title {
+      font-size: 32px;
+    }
+
+    .hero-subtitle {
+      font-size: 16px;
+    }
+
+    .hero-actions {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .interface-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .feature,
+    .feature-reverse {
+      grid-template-columns: 1fr;
+    }
+
+    .feature-reverse .feature-text {
+      order: 0;
+    }
+
+    .extras-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

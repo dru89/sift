@@ -1,0 +1,83 @@
+---
+interface Props {
+  currentPath?: string
+}
+
+const { currentPath = '' } = Astro.props
+const repoUrl = 'https://github.com/Dru89/sift'
+---
+
+<header class="header">
+  <div class="container">
+    <nav class="nav">
+      <a href="/" class="nav-logo">
+        <!-- <img src="/sift-icon.png" alt="" class="nav-logo-icon" /> -->
+        sift
+      </a>
+      <div class="nav-links">
+        <a href="/getting-started/" class:list={[{ active: currentPath.startsWith('/getting-started') }]}>Docs</a>
+        <a href="/cli/" class:list={[{ active: currentPath.startsWith('/cli') }]}>CLI</a>
+        <a href="/agents/" class:list={[{ active: currentPath.startsWith('/agents') }]}>Agents</a>
+        <a href={repoUrl}>GitHub</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    backdrop-filter: blur(12px);
+  }
+
+  .container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .nav-logo-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .nav-links a {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .nav-links a:hover,
+  .nav-links a.active {
+    color: var(--color-text);
+  }
+</style>

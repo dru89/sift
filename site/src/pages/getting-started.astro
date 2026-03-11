@@ -1,0 +1,135 @@
+---
+import DocsLayout from '../layouts/DocsLayout.astro'
+
+const repoUrl = 'https://github.com/Dru89/sift'
+---
+
+<DocsLayout title="Getting Started — sift" currentPath="/getting-started/">
+  <h1>Getting Started</h1>
+  <p class="subtitle">Set up sift and start managing your Obsidian tasks from the terminal.</p>
+
+  <h2>Prerequisites</h2>
+  <ul>
+    <li><strong>Node.js 20</strong> or later</li>
+    <li>An <strong>Obsidian vault</strong> using the <a href="https://publish.obsidian.md/tasks/">Obsidian Tasks</a> plugin with emoji format</li>
+  </ul>
+
+  <h2>Install</h2>
+  <p>Clone the repo and build:</p>
+  <pre><code>git clone {repoUrl}.git
+cd sift
+npm install
+npm run build</code></pre>
+
+  <p>To make <code>sift</code> available globally (so you can run it from anywhere):</p>
+  <pre><code>npm link --workspace=packages/cli</code></pre>
+
+  <h2>Configure your vault</h2>
+  <p>Point sift at your Obsidian vault:</p>
+  <pre><code>sift init "/path/to/your/vault"</code></pre>
+
+  <p>
+    This writes a config file to <code>~/.siftrc.json</code> with your vault path and default settings.
+    You can also set the <code>SIFT_VAULT_PATH</code> environment variable instead.
+  </p>
+
+  <p>The <code>init</code> command accepts additional options:</p>
+  <pre><code>sift init "/path/to/vault" \
+  --daily-notes "Daily Notes" \
+  --projects "Projects" \
+  --project-template "Templates/Project.md" \
+  --exclude Templates Attachments Archive</code></pre>
+
+  <h3>Config file format</h3>
+  <p>
+    The config file is JSON. Sift checks for it in this order (later sources override earlier):
+  </p>
+  <ol>
+    <li><code>~/.siftrc.json</code></li>
+    <li><code>./.siftrc.json</code> (per-directory)</li>
+    <li><code>SIFT_VAULT_PATH</code> environment variable</li>
+    <li>Explicit CLI flags</li>
+  </ol>
+
+  <pre><code>{JSON.stringify({
+    vaultPath: "/Users/you/Documents/My Vault",
+    dailyNotesPath: "Daily Notes",
+    dailyNotesFormat: "YYYY-MM-DD",
+    excludeFolders: ["Templates", "Attachments"],
+    projectsPath: "Projects",
+    projectTemplatePath: "Templates/Project.md"
+  }, null, 2)}</code></pre>
+
+  <h2>Your first commands</h2>
+
+  <h3>See what's going on</h3>
+  <pre><code>sift summary</code></pre>
+  <p>
+    Shows a quick dashboard: open/done counts, overdue tasks, high-priority items, and what to work on next.
+  </p>
+
+  <h3>What should I work on?</h3>
+  <pre><code>sift next</code></pre>
+  <p>
+    Shows the 10 most important open tasks, sorted by priority and urgency. Use <code>-n 5</code> for fewer.
+  </p>
+
+  <h3>Add a task</h3>
+  <pre><code>sift add "Review the architecture doc" --priority high --due 2026-03-10</code></pre>
+  <p>
+    Adds the task to today's daily note under the <code>## Journal</code> heading.
+    If the daily note doesn't exist, sift creates it from a template.
+  </p>
+
+  <h3>Mark something done</h3>
+  <pre><code>sift done "architecture doc"</code></pre>
+  <p>
+    Searches for an open task matching that text. If exactly one matches, it's marked done.
+    If multiple match, sift lists them so you can be more specific.
+  </p>
+
+  <h2>Working with projects</h2>
+  <p>
+    Projects are markdown files in your configured projects folder (default: <code>Projects/</code>)
+    with <code>type: project</code> in their YAML frontmatter.
+  </p>
+
+  <h3>List projects</h3>
+  <pre><code>sift projects</code></pre>
+
+  <h3>Add a task to a project</h3>
+  <pre><code>sift add "Design the API" --project "Website Redesign" --priority highest</code></pre>
+  <p>
+    The task goes under <code>## Tasks</code> in the project file and automatically gets a
+    <code>➕ YYYY-MM-DD</code> created date.
+  </p>
+
+  <h3>Add a note to a project</h3>
+  <pre><code>sift note --project "Website Redesign" "Decided to use REST over GraphQL"</code></pre>
+  <p>
+    Notes go under <code>## Notes</code> by default. Use <code>--heading</code> to target a different section.
+  </p>
+
+  <h3>Create a new project</h3>
+  <pre><code>sift project create "My New Project"</code></pre>
+  <p>
+    Creates a new project file from your configured template.
+  </p>
+
+  <h2>Per-repo project context</h2>
+  <p>
+    You can associate a code repository with a vault project by adding a <code>.siftrc.json</code>
+    in the repo root:
+  </p>
+  <pre><code>{JSON.stringify({ project: "Website Redesign" }, null, 2)}</code></pre>
+  <p>
+    When you run <code>sift summary</code> from that directory, it will show the associated project.
+    AI agents use this context to suggest routing tasks to the right project.
+  </p>
+
+  <h2>Next steps</h2>
+  <ul>
+    <li><a href="/cli/">CLI Reference</a> — full command documentation with all flags and examples</li>
+    <li><a href="/agents/">Agent Integration</a> — set up conversational task management with Claude or OpenCode</li>
+  </ul>
+</DocsLayout>

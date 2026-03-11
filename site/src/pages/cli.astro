@@ -1,0 +1,185 @@
+---
+import DocsLayout from '../layouts/DocsLayout.astro'
+---
+
+<DocsLayout title="CLI Reference — sift" currentPath="/cli/">
+  <h1>CLI Reference</h1>
+  <p class="subtitle">Full command documentation for the sift command-line interface.</p>
+
+  <h2 id="summary"><code>sift summary</code></h2>
+  <p>Quick dashboard showing open/done counts, overdue tasks, high-priority items, and what to work on next.</p>
+  <pre><code>sift summary</code></pre>
+
+  <h2 id="list"><code>sift list</code></h2>
+  <p>List all open tasks, sorted by priority and urgency. Alias: <code>sift ls</code>.</p>
+  <pre><code>sift list                          # all open tasks
+sift list --all                    # include done and cancelled
+sift list --search "proposal"      # filter by text
+sift list --priority high          # minimum priority level
+sift list --due-before 2026-03-10  # due on or before date
+sift list --show-file              # show file path and line number</code></pre>
+
+  <table>
+    <thead>
+      <tr><th>Flag</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>-a, --all</code></td><td>Include completed and cancelled tasks</td></tr>
+      <tr><td><code>-s, --search &lt;text&gt;</code></td><td>Filter by description text</td></tr>
+      <tr><td><code>-p, --priority &lt;level&gt;</code></td><td>Minimum priority: <code>highest</code>, <code>high</code>, <code>low</code>, <code>lowest</code></td></tr>
+      <tr><td><code>--due-before &lt;date&gt;</code></td><td>Tasks due on or before date (<code>YYYY-MM-DD</code>)</td></tr>
+      <tr><td><code>--show-file</code></td><td>Show file path and line number for each task</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="next"><code>sift next</code></h2>
+  <p>Show the most important tasks to work on right now, sorted by urgency.</p>
+  <pre><code>sift next        # top 10
+sift next -n 5   # top 5</code></pre>
+
+  <table>
+    <thead>
+      <tr><th>Flag</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>-n, --count &lt;number&gt;</code></td><td>Number of tasks to show (default: 10)</td></tr>
+      <tr><td><code>--show-file</code></td><td>Show file path and line number</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="today"><code>sift today</code></h2>
+  <p>Show tasks due today.</p>
+  <pre><code>sift today</code></pre>
+
+  <h2 id="overdue"><code>sift overdue</code></h2>
+  <p>Show overdue tasks (due date is before today).</p>
+  <pre><code>sift overdue</code></pre>
+
+  <h2 id="add"><code>sift add</code></h2>
+  <p>Add a new task to today's daily note, or to a project.</p>
+  <pre><code>sift add "Write the quarterly report"
+sift add "Review PR" --priority high
+sift add "Submit expenses" --due 2026-03-15
+sift add "Prepare presentation" --priority highest --scheduled 2026-03-08 --due 2026-03-10
+sift add "Team standup" --recurrence "every weekday"
+sift add "Design the API" --project "Website Redesign"</code></pre>
+
+  <table>
+    <thead>
+      <tr><th>Flag</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>-p, --priority &lt;level&gt;</code></td><td><code>highest</code>, <code>high</code>, <code>low</code>, or <code>lowest</code></td></tr>
+      <tr><td><code>-d, --due &lt;date&gt;</code></td><td>Due date (<code>YYYY-MM-DD</code>)</td></tr>
+      <tr><td><code>-s, --scheduled &lt;date&gt;</code></td><td>Scheduled date (<code>YYYY-MM-DD</code>)</td></tr>
+      <tr><td><code>--start &lt;date&gt;</code></td><td>Start date (<code>YYYY-MM-DD</code>)</td></tr>
+      <tr><td><code>-r, --recurrence &lt;rule&gt;</code></td><td>Recurrence rule (e.g., <code>"every week"</code>)</td></tr>
+      <tr><td><code>--project &lt;name&gt;</code></td><td>Add to a project instead of the daily note</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    When <code>--project</code> is used, the task is inserted under <code>## Tasks</code> in the project file
+    and automatically includes a <code>➕</code> created date.
+  </p>
+
+  <h2 id="find"><code>sift find</code></h2>
+  <p>
+    Search for open tasks without modifying them. Shows matching tasks with file paths and line numbers.
+    Useful for previewing before completing.
+  </p>
+  <pre><code>sift find "quarterly report"
+sift find "architecture"</code></pre>
+
+  <h2 id="done"><code>sift done</code></h2>
+  <p>Mark a task as complete. Supports two modes:</p>
+
+  <h3>Search mode</h3>
+  <p>Find and complete by description:</p>
+  <pre><code>sift done "quarterly report"</code></pre>
+  <p>
+    If exactly one open task matches, it's marked done. If multiple match, they're listed so you can be more specific.
+  </p>
+
+  <h3>Precise mode</h3>
+  <p>Complete by exact file and line number:</p>
+  <pre><code>sift done --file "Daily Notes/2026-03-10.md" --line 13</code></pre>
+
+  <table>
+    <thead>
+      <tr><th>Flag</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>--file &lt;path&gt;</code></td><td>File path (relative to vault root)</td></tr>
+      <tr><td><code>--line &lt;number&gt;</code></td><td>Line number in the file</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="note"><code>sift note</code></h2>
+  <p>Add a freeform note (not a task) to today's daily note or to a project.</p>
+  <pre><code>sift note "Had a great meeting about the roadmap"
+sift note --project "Website Redesign" "Decided to use the new API design"
+sift note --project "Website Redesign" --heading "## Log" "Shipped v1.0"</code></pre>
+
+  <table>
+    <thead>
+      <tr><th>Flag</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>--project &lt;name&gt;</code></td><td>Add note to a project instead of the daily note</td></tr>
+      <tr><td><code>--heading &lt;heading&gt;</code></td><td>Target heading (default: <code>## Journal</code> for daily, <code>## Notes</code> for projects)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="projects"><code>sift projects</code></h2>
+  <p>List all projects in the vault.</p>
+  <pre><code>sift projects</code></pre>
+
+  <h2 id="project-create"><code>sift project create</code></h2>
+  <p>Create a new project from the configured template.</p>
+  <pre><code>sift project create "My New Project"</code></pre>
+
+  <h2 id="project-path"><code>sift project path</code></h2>
+  <p>Get the vault-relative file path for a project. Useful for scripting or agent integrations.</p>
+  <pre><code>sift project path "My Project"              # vault-relative path
+sift project path --absolute "My Project"   # absolute path</code></pre>
+
+  <table>
+    <thead>
+      <tr><th>Flag</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>--absolute</code></td><td>Return the absolute path instead of vault-relative</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="init"><code>sift init</code></h2>
+  <p>Set up the sift configuration file.</p>
+  <pre><code>sift init "/path/to/vault"
+sift init "/path/to/vault" --daily-notes "Journal"
+sift init "/path/to/vault" --projects "Projects" --project-template "Templates/Project.md"
+sift init "/path/to/vault" --exclude Templates Attachments Archive</code></pre>
+
+  <h2 id="global-options">Global options</h2>
+  <p>All list-style commands support <code>--show-file</code> to display the file path and line number for each task.</p>
+
+  <h2 id="task-format">Task format reference</h2>
+  <p>Sift reads and writes the <a href="https://publish.obsidian.md/tasks/Reference/Task+Formats/Tasks+Emoji+Format">Obsidian Tasks emoji format</a>:</p>
+  <table>
+    <thead>
+      <tr><th>Emoji</th><th>Meaning</th><th>Example</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>⏫</code></td><td>Highest priority</td><td></td></tr>
+      <tr><td><code>🔼</code></td><td>High priority</td><td></td></tr>
+      <tr><td><code>🔽</code></td><td>Low priority</td><td></td></tr>
+      <tr><td><code>⏬</code></td><td>Lowest priority</td><td></td></tr>
+      <tr><td><code>⏳</code></td><td>Scheduled date</td><td><code>⏳ 2026-03-07</code></td></tr>
+      <tr><td><code>📅</code></td><td>Due date</td><td><code>📅 2026-03-10</code></td></tr>
+      <tr><td><code>🛫</code></td><td>Start date</td><td><code>🛫 2026-03-01</code></td></tr>
+      <tr><td><code>✅</code></td><td>Done date</td><td><code>✅ 2026-03-06</code></td></tr>
+      <tr><td><code>➕</code></td><td>Created date</td><td><code>➕ 2026-03-01</code></td></tr>
+      <tr><td><code>🔁</code></td><td>Recurrence</td><td><code>🔁 every week</code></td></tr>
+    </tbody>
+  </table>
+</DocsLayout>

@@ -1,0 +1,280 @@
+---
+import DocsLayout from '../layouts/DocsLayout.astro'
+
+const repoUrl = 'https://github.com/Dru89/sift'
+
+const agentConversation = `YOU:   What should I work on today?
+
+AGENT: You have 8 open tasks, 1 overdue, and 2 due today.
+
+       The most urgent is "Write the quarterly report" — it was
+       due yesterday and is highest priority. I'd start there.
+
+       After that, "Review the architecture doc" is due today.
+
+YOU:   I finished the report. Mark it done.
+
+AGENT: Found it: "Write the quarterly report" in
+       Daily Notes/2026-03-10.md, line 13. Mark it as done?
+
+YOU:   Yes
+
+AGENT: Done! Marked "Write the quarterly report" as complete.
+
+YOU:   Add a task to the Website Redesign project to design
+       the new API endpoint. High priority, due next Friday.
+
+AGENT: Added to project "Website Redesign":
+       - [ ] Design the new API endpoint 🔼 📅 2026-03-14 ➕ 2026-03-10`
+---
+
+<DocsLayout title="Agent Integration — sift" currentPath="/agents/">
+  <h1>Agent Integration</h1>
+  <p class="subtitle">
+    Set up conversational task management with Claude Code, Claude Desktop, or OpenCode.
+  </p>
+
+  <p>
+    Sift integrates with AI coding agents so you can manage your Obsidian tasks through
+    natural conversation. Ask your agent about your tasks, add new ones, mark things done,
+    and manage projects — all without switching context.
+  </p>
+
+  <div class="conversation-demo">
+    <pre>{agentConversation}</pre>
+  </div>
+
+  <h2>How it works</h2>
+  <p>
+    Sift provides tools that your AI agent can call. The agent sees the tool descriptions,
+    decides when to use them based on your conversation, and calls the <code>sift</code> CLI under the hood.
+  </p>
+
+  <h3>Available tools</h3>
+  <table>
+    <thead>
+      <tr><th>Tool</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>sift_list</code></td><td>List open tasks with optional search/priority/date filters</td></tr>
+      <tr><td><code>sift_next</code></td><td>Get the most important tasks sorted by urgency</td></tr>
+      <tr><td><code>sift_summary</code></td><td>Quick overview of task status</td></tr>
+      <tr><td><code>sift_add</code></td><td>Add a task to today's daily note or a project</td></tr>
+      <tr><td><code>sift_find</code></td><td>Search tasks without modifying them</td></tr>
+      <tr><td><code>sift_done</code></td><td>Mark a task as complete (by search or precise file:line)</td></tr>
+      <tr><td><code>sift_projects</code></td><td>List all projects in the vault</td></tr>
+      <tr><td><code>sift_projectCreate</code></td><td>Create a new project from template</td></tr>
+      <tr><td><code>sift_projectPath</code></td><td>Get the file path for a project</td></tr>
+      <tr><td><code>sift_addNote</code></td><td>Add a freeform note to a daily note or project</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    Tool names use underscores in MCP (e.g., <code>sift_project_create</code>)
+    and camelCase in OpenCode (e.g., <code>sift_projectCreate</code>).
+  </p>
+
+  <h2>Setup for Claude Code / Claude Desktop</h2>
+  <p>
+    Claude Code and Claude Desktop use the
+    <a href="https://modelcontextprotocol.io/">Model Context Protocol (MCP)</a>.
+    Sift runs as a local MCP server that exposes its tools.
+  </p>
+
+  <pre><code># 1. Build everything (CLI + MCP server)
+npm install
+npm run build
+
+# 2. Link sift globally so the MCP server can find it
+npm link --workspace=packages/cli
+
+# 3. Configure your vault (if not already done)
+sift init "/path/to/your/vault"
+
+# 4. Run the install script
+./scripts/install-agent-claude.sh
+
+# 5. Restart Claude Desktop and/or Claude Code</code></pre>
+
+  <p>The install script automatically updates:</p>
+  <ul>
+    <li><strong>Claude Desktop:</strong> <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+    <li><strong>Claude Code:</strong> <code>~/.claude.json</code></li>
+  </ul>
+
+  <h3>Manual configuration</h3>
+  <p>If you prefer to configure manually, add this to your Claude config:</p>
+  <pre><code>{JSON.stringify({
+    mcpServers: {
+      sift: {
+        command: "node",
+        args: ["/path/to/sift/packages/agent-skill/dist/mcp-server.js"]
+      }
+    }
+  }, null, 2)}</code></pre>
+
+  <p>
+    If <code>sift</code> isn't on your PATH, add <code>SIFT_CLI_PATH</code> to the <code>env</code> section
+    pointing to the built CLI entry point.
+  </p>
+
+  <h2>Setup for OpenCode</h2>
+  <p>
+    <a href="https://opencode.ai">OpenCode</a> uses a skill + custom tools model.
+    The skill tells the agent what sift does and when to use it; the tools define what it can call.
+  </p>
+
+  <pre><code># 1. Build the CLI
+npm install
+npm run build
+
+# 2. Make sure sift is on your PATH
+npm link --workspace=packages/cli
+
+# 3. Configure your vault (if not already done)
+sift init "/path/to/your/vault"
+
+# 4. Install the skill and tools
+./scripts/install-agent.sh
+
+# 5. Restart OpenCode</code></pre>
+
+  <p>The install script copies files to:</p>
+  <ul>
+    <li><code>~/.config/opencode/skills/sift/SKILL.md</code></li>
+    <li><code>~/.config/opencode/tools/sift.ts</code></li>
+  </ul>
+
+  <h3>Manual setup</h3>
+  <pre><code>mkdir -p ~/.config/opencode/skills/sift
+cp packages/agent-skill/SKILL.md ~/.config/opencode/skills/sift/SKILL.md
+cp packages/agent-skill/tools/sift.ts ~/.config/opencode/tools/sift.ts</code></pre>
+
+  <h2>Keeping things up to date</h2>
+  <p>
+    When you make changes to sift, you'll need to redeploy the agent tools:
+  </p>
+
+  <h3>For Claude Code / Claude Desktop</h3>
+  <pre><code>npm run build --workspace=packages/agent-skill
+# Then restart Claude Desktop and/or Claude Code</code></pre>
+
+  <h3>For OpenCode</h3>
+  <pre><code>./scripts/install-agent.sh
+# Then restart OpenCode</code></pre>
+
+  <h2>What you can say</h2>
+  <p>
+    Once set up, your AI agent will automatically recognize task-related requests.
+    Here are some examples:
+  </p>
+
+  <div class="prompt-grid">
+    <div class="prompt-card">
+      <h4>Check in</h4>
+      <ul>
+        <li>"What's on my plate?"</li>
+        <li>"What should I work on next?"</li>
+        <li>"Show me my overdue tasks"</li>
+        <li>"How many tasks do I have open?"</li>
+      </ul>
+    </div>
+    <div class="prompt-card">
+      <h4>Add tasks</h4>
+      <ul>
+        <li>"Add a task to review the PR by Friday"</li>
+        <li>"Remind me to submit expenses"</li>
+        <li>"Add a high-priority task to the Website project"</li>
+        <li>"I need to prepare the demo slides for Monday"</li>
+      </ul>
+    </div>
+    <div class="prompt-card">
+      <h4>Complete tasks</h4>
+      <ul>
+        <li>"Mark the quarterly report as done"</li>
+        <li>"I finished the architecture review"</li>
+        <li>"Done with the PR"</li>
+      </ul>
+    </div>
+    <div class="prompt-card">
+      <h4>Projects & notes</h4>
+      <ul>
+        <li>"What projects do I have?"</li>
+        <li>"Add a note to Website Redesign"</li>
+        <li>"Create a new project called 'Q2 Planning'"</li>
+        <li>"What's in the Health Tracker project?"</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>CWD project context</h2>
+  <p>
+    If your code repository has a <code>.siftrc.json</code> with a <code>project</code> field,
+    agents will be aware of the associated vault project. They'll suggest routing tasks to that
+    project when appropriate and show the context in summaries.
+  </p>
+  <pre><code>{JSON.stringify({ project: "Website Redesign" }, null, 2)}</code></pre>
+
+  <h2>Safe task completion</h2>
+  <p>
+    Agents follow a two-step flow to prevent accidentally marking the wrong task:
+  </p>
+  <ol>
+    <li><strong>Search first</strong> — the agent calls <code>sift_find</code> to locate the task and shows you the match</li>
+    <li><strong>Confirm</strong> — you verify it's the right task</li>
+    <li><strong>Complete precisely</strong> — the agent calls <code>sift_done</code> with the exact file path and line number</li>
+  </ol>
+  <p>
+    This means you'll never accidentally complete the wrong task, even if multiple tasks have similar descriptions.
+  </p>
+</DocsLayout>
+
+<style>
+  .conversation-demo {
+    margin: 24px 0 32px;
+  }
+
+  .conversation-demo pre {
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .prompt-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .prompt-card {
+    padding: 20px;
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+  }
+
+  .prompt-card h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .prompt-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .prompt-card li {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    padding: 3px 0;
+    margin: 0;
+  }
+
+  @media (max-width: 768px) {
+    .prompt-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
