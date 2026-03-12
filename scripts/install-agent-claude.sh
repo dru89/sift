@@ -40,11 +40,22 @@ else
     fi
 fi
 
+# Resolve the absolute path to the current node binary.
+# This ensures MCP servers use the same Node version that's active at install
+# time, regardless of how the host app resolves PATH (e.g., nvm shims may not
+# be available to Claude Desktop).
+NODE_PATH="$(command -v node)"
+if [ -L "$NODE_PATH" ]; then
+    # Follow symlinks (e.g., nvm or pnpm shims)
+    NODE_PATH="$(readlink -f "$NODE_PATH" 2>/dev/null || python3 -c "import os; print(os.path.realpath('$NODE_PATH'))")"
+fi
+echo "  Using node: $NODE_PATH ($(node --version))"
+
 # Build the JSON snippet for the sift MCP server entry
 if [ -n "$SIFT_CLI_PATH" ]; then
     MCP_SERVER_JSON=$(node -e "
         console.log(JSON.stringify({
-            command: 'node',
+            command: '$NODE_PATH',
             args: ['$MCP_SERVER_PATH'],
             env: { SIFT_CLI_PATH: '$SIFT_CLI_PATH' }
         }, null, 2));
@@ -52,7 +63,7 @@ if [ -n "$SIFT_CLI_PATH" ]; then
 else
     MCP_SERVER_JSON=$(node -e "
         console.log(JSON.stringify({
-            command: 'node',
+            command: '$NODE_PATH',
             args: ['$MCP_SERVER_PATH']
         }, null, 2));
     ")
