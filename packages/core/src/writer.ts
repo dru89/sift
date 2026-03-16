@@ -344,7 +344,7 @@ async function addTaskToProject(
   let content = await fs.readFile(fullPath, "utf-8");
 
   // Try to insert under ## Tasks, fall back to appending
-  content = insertContentUnderHeading(content, taskLine, "## Tasks");
+  content = insertContentUnderHeading(content, taskLine, "## Tasks", "## Changelog");
   await fs.writeFile(fullPath, content, "utf-8");
 
   return taskLine;
@@ -397,7 +397,7 @@ async function addNoteToProject(
   let content = await fs.readFile(fullPath, "utf-8");
 
   const heading = options.heading || "## Notes";
-  content = insertContentUnderHeading(content, options.content, heading);
+  content = insertContentUnderHeading(content, options.content, heading, "## Changelog");
 
   // Generate a changelog summary from the note content
   const summary = options.changelogSummary || generateChangelogSummary(options.content, heading);
@@ -504,6 +504,11 @@ function generateChangelogSummary(content: string, heading: string): string {
  * (before the next heading or end of file). If the heading doesn't exist,
  * it is appended to the end of the file.
  *
+ * When `beforeHeading` is provided and the target heading doesn't exist,
+ * the new section is inserted immediately before `beforeHeading` instead
+ * of at the end. This keeps anchor sections (like "## Changelog") at the
+ * bottom of the file.
+ *
  * Supports multi-line content: each line is inserted as a separate line
  * in the file.
  */
@@ -511,6 +516,7 @@ function insertContentUnderHeading(
   fileContent: string,
   newContent: string,
   heading: string,
+  beforeHeading?: string,
 ): string {
   const lines = fileContent.split("\n");
   let headingIdx = -1;
@@ -523,7 +529,30 @@ function insertContentUnderHeading(
   }
 
   if (headingIdx === -1) {
-    // Heading not found, append to end
+    // Heading not found — insert before `beforeHeading` if it exists,
+    // otherwise append to end.
+    if (beforeHeading) {
+      let beforeIdx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === beforeHeading) {
+          beforeIdx = i;
+          break;
+        }
+      }
+      if (beforeIdx !== -1) {
+        // Insert the new heading + content before the anchor heading.
+        // Consume any leading blank lines so spacing stays clean.
+        let insertIdx = beforeIdx;
+        while (insertIdx > 0 && lines[insertIdx - 1].trim() === "") {
+          insertIdx--;
+        }
+        const block = ["", heading, newContent, ""];
+        lines.splice(insertIdx, beforeIdx - insertIdx, ...block);
+        return lines.join("\n");
+      }
+    }
+
+    // No beforeHeading or it wasn't found — append to end
     return fileContent.trimEnd() + "\n\n" + heading + "\n" + newContent + "\n";
   }
 
