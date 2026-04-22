@@ -334,7 +334,7 @@ export const note = tool({
 
 export const subnote = tool({
   description:
-    "Create a new note file linked to a project. Use this instead of sift_note when the content is long (>20 lines), self-contained (design spec, meeting notes, API reference), or has a different lifecycle than the project file itself. Creates the file and inserts a wiki link in the project. Optionally creates a task linking to the subnote.",
+    "Create a new note file linked to a project. Use this instead of sift_note when the content is long (>20 lines), self-contained (design spec, meeting notes, API reference), or has a different lifecycle than the project file itself. Creates the file and inserts a wiki link in the project. To also create a trackable task, call sift_add separately with a wiki link to the subnote in the description. The return value includes the wiki link name for easy reference.",
   args: {
     project: tool.schema
       .string()
@@ -370,16 +370,6 @@ export const subnote = tool({
       .describe(
         "Heading in the project file to insert the backlink under. Defaults to '## Notes'.",
       ),
-    task: tool.schema
-      .string()
-      .optional()
-      .describe(
-        "If provided, also creates a task in the project's ## Tasks section with this description, linking to the subnote. Use this when the subnote represents work to be done (e.g., 'Design HTTP API for remote access').",
-      ),
-    taskPriority: tool.schema
-      .enum(["highest", "high", "low", "lowest"])
-      .optional()
-      .describe("Priority for the auto-created task. Only used when task is provided."),
   },
   async execute(args) {
     const cliArgs = ["subnote", "--absolute"];
@@ -389,8 +379,6 @@ export const subnote = tool({
     if (args.type) cliArgs.push("--type", args.type);
     if (args.tags && args.tags.length > 0) cliArgs.push("--tags", ...args.tags);
     if (args.heading) cliArgs.push("--heading", args.heading);
-    if (args.task) cliArgs.push("--task", args.task);
-    if (args.taskPriority) cliArgs.push("--task-priority", args.taskPriority);
     cliArgs.push("--", args.title);
     return runSift(cliArgs);
   },

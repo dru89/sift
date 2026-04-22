@@ -96,17 +96,6 @@ export interface CreateSubnoteOptions {
    * Defaults to "## Notes".
    */
   heading?: string;
-
-  /**
-   * If provided, also creates a task in the project file linking to this subnote.
-   * The value is the task description. A wiki link to the subnote is appended automatically.
-   */
-  task?: string;
-
-  /**
-   * Priority for the auto-created task. Only used when `task` is provided.
-   */
-  taskPriority?: Priority;
 }
 
 /**
@@ -119,8 +108,8 @@ export interface SubnoteResult {
   project: string;
   /** The title of the subnote */
   title: string;
-  /** The task line that was created, if any */
-  taskLine?: string;
+  /** The wiki link name (filename without extension), for use in task descriptions */
+  linkName: string;
 }
 
 /**
@@ -297,35 +286,13 @@ export async function createSubnote(
   const projectFullPath = path.join(config.vaultPath, project.filePath);
   let projectContent = await fs.readFile(projectFullPath, "utf-8");
   projectContent = insertContentUnderHeading(projectContent, linkLine, heading, "## Changelog");
-
-  // Optionally create a task in the project file linking to the subnote
-  let taskLine: string | undefined;
-  if (options.task) {
-    const noteName = path.basename(fileName, ".md");
-    const taskDescription = `${options.task} [[${noteName}]]`;
-    taskLine = formatTask({
-      description: taskDescription,
-      status: "open",
-      priority: options.taskPriority || "none",
-      scheduled: null,
-      due: null,
-      start: null,
-      done: null,
-      created: localToday(),
-      recurrence: null,
-    });
-    // Strip self-referential project links from the task description
-    taskLine = stripSelfLinks(taskLine, project.name);
-    projectContent = insertContentUnderHeading(projectContent, taskLine, "## Tasks", "## Changelog");
-  }
-
   await fs.writeFile(projectFullPath, projectContent, "utf-8");
 
   return {
     filePath,
     project: project.name,
     title: options.title,
-    taskLine,
+    linkName: noteName,
   };
 }
 
