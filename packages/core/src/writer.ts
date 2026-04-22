@@ -62,6 +62,55 @@ export interface AddNoteOptions {
 }
 
 /**
+ * Options for creating a subnote linked to a project.
+ */
+export interface CreateSubnoteOptions {
+  /** The project to link this subnote to (required) */
+  project: string;
+
+  /** Title of the subnote (used in filename and heading) */
+  title: string;
+
+  /** Content of the subnote (can be multi-line markdown) */
+  content?: string;
+
+  /**
+   * The folder to place the subnote in, relative to vault root.
+   * Defaults to "Notes".
+   */
+  folder?: string;
+
+  /**
+   * The frontmatter `type` field for the subnote.
+   * Defaults to "note".
+   */
+  type?: string;
+
+  /**
+   * Tags to add to the subnote frontmatter.
+   */
+  tags?: string[];
+
+  /**
+   * The heading in the project file to insert the backlink under.
+   * Defaults to "## Notes".
+   */
+  heading?: string;
+}
+
+/**
+ * Result of creating a subnote.
+ */
+export interface SubnoteResult {
+  /** Path to the created subnote, relative to vault root */
+  filePath: string;
+  /** The project the subnote is linked to */
+  project: string;
+  /** The title of the subnote */
+  title: string;
+}
+
+/**
  * Add a new task to today's daily note, or to a project file if specified.
  *
  * When `options.project` is provided, the task is added under the "## Tasks"
@@ -157,6 +206,91 @@ export async function addNote(
     return addNoteToProject(config, options);
   }
   return addNoteToDailyNote(config, options);
+}
+
+/**
+ * Create a new subnote file linked to a project.
+ *
+ * Creates a markdown file in the specified folder (default "Notes") with
+ * frontmatter linking it back to the project, then inserts a wiki link
+ * to the new note in the project file under the specified heading.
+ *
+ * Filename format: `YYYY-MM-DD - <title>.md`
+ *
+ * @param config - The sift configuration
+ * @param options - The subnote options
+ * @returns Info about the created subnote
+ */
+export async function createSubnote(
+  config: SiftConfig,
+  options: CreateSubnoteOptions,
+): Promise<SubnoteResult> {
+  const project = await findProject(config, options.project);
+  if (!project) {
+    throw new Error(
+      `Project "${options.project}" not found. Use "sift projects" to see available projects.`,
+    );
+  }
+
+  const today = localToday();
+  const folder = options.folder || "Notes";
+  const noteType = options.type || "note";
+  const fileName = `${today} - ${options.title}.md`;
+  const filePath = path.join(folder, fileName);
+  const fullPath = path.join(config.vaultPath, filePath);
+
+  // Check for name collision
+  try {
+    await fs.access(fullPath);
+    throw new Error(
+      `File already exists: ${filePath}. Choose a different title.`,
+    );
+  } catch (err: any) {
+    if (err.code !== "ENOENT") throw err;
+    // File doesn't exist — good, we can create it
+  }
+
+  // Build frontmatter
+  const frontmatterLines = [
+    "---",
+    `type: ${noteType}`,
+    `date: ${today}`,
+    `project: "[[${project.name}]]"`,
+  ];
+  if (options.tags && options.tags.length > 0) {
+    frontmatterLines.push(`tags: [${options.tags.join(", ")}]`);
+  }
+  frontmatterLines.push("---");
+
+  // Build file content
+  const parts = [frontmatterLines.join("\n")];
+  if (options.content) {
+    parts.push("");
+    parts.push(options.content);
+  }
+  const fileContent = parts.join("\n") + "\n";
+
+  // Ensure the folder exists
+  await fs.mkdir(path.dirname(fullPath), { recursive: true });
+
+  // Write the subnote file
+  await fs.writeFile(fullPath, fileContent, "utf-8");
+
+  // Insert a link in the project file
+  const noteName = path.basename(fileName, ".md");
+  const linkLine = `- [[${noteName}]]`;
+  const heading = options.heading || "## Notes";
+
+  const projectFullPath = path.join(config.vaultPath, project.filePath);
+  let projectContent = await fs.readFile(projectFullPath, "utf-8");
+  projectContent = insertContentUnderHeading(projectContent, linkLine, heading, "## Changelog");
+  await fs.writeFile(projectFullPath, projectContent, "utf-8");
+
+  return {
+    filePath,
+    project: project.name,
+    title: options.title,
+  };
 }
 
 /**

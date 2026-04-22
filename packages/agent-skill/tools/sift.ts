@@ -332,6 +332,58 @@ export const note = tool({
   },
 });
 
+export const subnote = tool({
+  description:
+    "Create a new note file linked to a project. Use this instead of sift_note when the content is long (>20 lines), self-contained (design spec, meeting notes, API reference), or has a different lifecycle than the project file itself. Creates the file and inserts a wiki link in the project.",
+  args: {
+    project: tool.schema
+      .string()
+      .describe("Name of the project to link this note to."),
+    title: tool.schema
+      .string()
+      .describe(
+        "Title for the subnote. Used in the filename (YYYY-MM-DD - <title>.md) and as a heading.",
+      ),
+    content: tool.schema
+      .string()
+      .optional()
+      .describe("The content of the subnote (can be multi-line markdown)."),
+    folder: tool.schema
+      .string()
+      .optional()
+      .describe(
+        "Folder to create the note in, relative to vault root. Defaults to 'Notes'. Use 'Meetings' for meeting notes.",
+      ),
+    type: tool.schema
+      .string()
+      .optional()
+      .describe(
+        "Frontmatter type field. Defaults to 'note'. Use 'meeting' for meeting notes.",
+      ),
+    tags: tool.schema
+      .array(tool.schema.string())
+      .optional()
+      .describe("Tags to add to the subnote frontmatter."),
+    heading: tool.schema
+      .string()
+      .optional()
+      .describe(
+        "Heading in the project file to insert the backlink under. Defaults to '## Notes'.",
+      ),
+  },
+  async execute(args) {
+    const cliArgs = ["subnote", "--absolute"];
+    cliArgs.push("--project", args.project);
+    if (args.content) cliArgs.push("--content", args.content);
+    if (args.folder) cliArgs.push("--folder", args.folder);
+    if (args.type) cliArgs.push("--type", args.type);
+    if (args.tags && args.tags.length > 0) cliArgs.push("--tags", ...args.tags);
+    if (args.heading) cliArgs.push("--heading", args.heading);
+    cliArgs.push("--", args.title);
+    return runSift(cliArgs);
+  },
+});
+
 export const project_set = tool({
   description:
     "Update frontmatter fields on a project (status, timeframe, tags). Use this to change a project's status (active, planning, someday, done), timeframe, or tags.",

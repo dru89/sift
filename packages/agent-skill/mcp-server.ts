@@ -279,18 +279,18 @@ const tools: Tool[] = [
   {
     name: "sift_note",
     description:
-      "Add a freeform note to today's daily note or to a project. Use this for non-task content like observations, decisions, meeting notes, or project updates.",
+      "Add a freeform note to today's daily note or to a project. For projects, also adds a changelog entry.",
     inputSchema: {
       type: "object",
       properties: {
         content: {
           type: "string",
-          description: "The note content (can be multi-line)",
+          description: "The note content (can be multi-line).",
         },
         project: {
           type: "string",
           description:
-            "Name of the project to add the note to. If omitted, the note goes to today's daily note.",
+            "Name of the project to add this note to. If omitted, the note goes to today's daily note.",
         },
         heading: {
           type: "string",
@@ -305,10 +305,54 @@ const tools: Tool[] = [
         date: {
           type: "string",
           description:
-            "Target daily note date in YYYY-MM-DD format. Defaults to today. Ignored when project is set.",
+            "Target daily note date (YYYY-MM-DD). Defaults to today. Ignored when project is set.",
         },
       },
       required: ["content"],
+    },
+  },
+  {
+    name: "sift_subnote",
+    description:
+      "Create a new note file linked to a project. Use this instead of sift_note when the content is long (>20 lines), self-contained (design spec, meeting notes, API reference), or has a different lifecycle than the project file itself. Creates the file and inserts a wiki link in the project.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: {
+          type: "string",
+          description: "Name of the project to link this note to.",
+        },
+        title: {
+          type: "string",
+          description:
+            "Title for the subnote. Used in the filename (YYYY-MM-DD - <title>.md) and as a heading.",
+        },
+        content: {
+          type: "string",
+          description: "The content of the subnote (can be multi-line markdown).",
+        },
+        folder: {
+          type: "string",
+          description:
+            "Folder to create the note in, relative to vault root. Defaults to 'Notes'. Use 'Meetings' for meeting notes.",
+        },
+        type: {
+          type: "string",
+          description:
+            "Frontmatter type field. Defaults to 'note'. Use 'meeting' for meeting notes.",
+        },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Tags to add to the subnote frontmatter.",
+        },
+        heading: {
+          type: "string",
+          description:
+            "Heading in the project file to insert the backlink under. Defaults to '## Notes'.",
+        },
+      },
+      required: ["project", "title"],
     },
   },
   {
@@ -619,6 +663,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (args?.date)
           cliArgs.push("--date", args.date as string);
         cliArgs.push("--", args?.content as string);
+        const result = runSift(cliArgs);
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      }
+
+      case "sift_subnote": {
+        const cliArgs = ["subnote", "--absolute"];
+        cliArgs.push("--project", args?.project as string);
+        if (args?.content)
+          cliArgs.push("--content", args.content as string);
+        if (args?.folder)
+          cliArgs.push("--folder", args.folder as string);
+        if (args?.type)
+          cliArgs.push("--type", args.type as string);
+        if (args?.tags && Array.isArray(args.tags) && args.tags.length > 0)
+          cliArgs.push("--tags", ...(args.tags as string[]));
+        if (args?.heading)
+          cliArgs.push("--heading", args.heading as string);
+        cliArgs.push("--", args?.title as string);
         const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],

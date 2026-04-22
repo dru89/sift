@@ -14,6 +14,7 @@ import {
   sortByUrgency,
   addTask,
   addNote,
+  createSubnote,
   completeTask,
   findTasks,
   markTaskStatus,
@@ -290,6 +291,43 @@ program
           : "today's daily note";
       const heading = opts.heading || (opts.project ? "## Notes" : "## Journal");
       console.log(chalk.green("✓") + ` Added note to ${target} under ${heading}`);
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
+    }
+  });
+
+// ─── sift subnote ─────────────────────────────────────────────
+program
+  .command("subnote <title...>")
+  .description("Create a new note file linked to a project")
+  .requiredOption("--project <name>", "Project to link this note to")
+  .option("--folder <folder>", "Folder to create the note in (default: Notes)")
+  .option("--type <type>", "Frontmatter type field (default: note)")
+  .option("--tags <tags...>", "Tags to add to frontmatter")
+  .option("--heading <heading>", "Heading in project file to insert link under (default: ## Notes)")
+  .option("--absolute", "Show absolute file path in output")
+  .option("--content <content>", "Initial content for the subnote")
+  .action(async (titleParts: string[], opts) => {
+    const config = await resolveConfig();
+    const title = titleParts.join(" ");
+
+    try {
+      const result = await createSubnote(config, {
+        project: opts.project,
+        title,
+        content: opts.content,
+        folder: opts.folder,
+        type: opts.type,
+        tags: opts.tags,
+        heading: opts.heading,
+      });
+
+      const displayPath = opts.absolute
+        ? path.join(config.vaultPath, result.filePath)
+        : result.filePath;
+      console.log(chalk.green("✓") + ` Created subnote: ${displayPath}`);
+      console.log(chalk.dim(`  Linked from: ${result.project}`));
     } catch (err: any) {
       console.error(chalk.red("Error: ") + err.message);
       process.exit(1);
