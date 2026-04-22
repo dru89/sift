@@ -20,7 +20,7 @@ The following custom tools are available for interacting with the user's tasks:
 - **`sift_mark`** - Mark a task with any status: `in_progress`, `on_hold`, `moved`, `cancelled`, `open`, or `done` (use `sift_find` first)
 - **`sift_projects`** - List all projects in the vault (with status, tags, created date)
 - **`sift_project_create`** - Create a new project from template
-- **`sift_project_path`** - Get the vault-relative file path for a project (for reading/editing)
+- **`sift_project_path`** - Get the absolute file path for a project (for reading/editing)
 - **`sift_project_set`** - Update project frontmatter: `--status` and/or `--timeframe`
 - **`sift_note`** - Add a freeform note to a daily note or project file
 - **`sift_review`** - Generate a review summary (completed, created, stale, changelog, upcoming)
@@ -168,15 +168,15 @@ Use `sift_note` to add freeform content (not tasks) to a project or daily note. 
 When the user asks you to "check out" a project, look at project notes, or references a specific project by name, use the sift tools to find and read it:
 
 1. Use `sift_projects` to list all projects (to confirm the project name if needed)
-2. Use `sift_project_path` to get the vault-relative file path for the project
-3. Use `sift_summary` to get the vault path, then prepend it to the project path to read the file
+2. Use `sift_project_path` to get the absolute file path for the project
+3. Read or edit the file directly using the path from `sift_project_path`
 
 This lets you:
 - Read the project file to understand its current state, goals, and notes
 - Make direct edits to any section of the project
 - Check what tasks, notes, or goals already exist
 
-The path returned by `sift_project_path` is relative to the vault root. To get the absolute path for file operations, prepend the vault path from the sift configuration (visible in `sift_summary` output).
+All paths returned by sift tools (including `sift_find`, `sift_list`, `sift_next`, `sift_review`) are **absolute paths** that can be used directly for file operations. These same absolute paths are accepted by `sift_done` and `sift_mark` when targeting tasks.
 
 ## Date handling for new tasks
 

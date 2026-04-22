@@ -57,7 +57,7 @@ export const list = tool({
       .describe("Include completed and cancelled tasks"),
   },
   async execute(args) {
-    const cliArgs = ["list", "--show-file"];
+    const cliArgs = ["list", "--show-file", "--absolute"];
     if (args.search) cliArgs.push("--search", args.search);
     if (args.priority) cliArgs.push("--priority", args.priority);
     if (args.dueBefore) cliArgs.push("--due-before", args.dueBefore);
@@ -76,7 +76,7 @@ export const next = tool({
       .describe("Number of tasks to show (default: 10)"),
   },
   async execute(args) {
-    const cliArgs = ["next", "--show-file"];
+    const cliArgs = ["next", "--show-file", "--absolute"];
     if (args.count) cliArgs.push("-n", String(args.count));
     return runSift(cliArgs);
   },
@@ -152,7 +152,7 @@ export const find = tool({
       .describe("Text to search for in task descriptions"),
   },
   async execute(args) {
-    return runSift(["find", "--show-file", "--", args.search]);
+    return runSift(["find", "--show-file", "--absolute", "--", args.search]);
   },
 });
 
@@ -170,7 +170,7 @@ export const done = tool({
       .string()
       .optional()
       .describe(
-        "File path (relative to vault root) for precise completion. Must be used with 'line'.",
+        "Absolute file path for precise completion (also accepts vault-relative). Must be used with 'line'.",
       ),
     line: tool.schema
       .number()
@@ -224,20 +224,20 @@ export const project_create = tool({
       .describe("The project name (becomes the filename)"),
   },
   async execute(args) {
-    return runSift(["project", "create", "--", args.name]);
+    return runSift(["project", "create", "--absolute", "--", args.name]);
   },
 });
 
 export const project_path = tool({
   description:
-    "Get the vault-relative file path for a project. Useful when you need to read or edit a project file directly.",
+    "Get the absolute file path for a project. Useful when you need to read or edit a project file directly.",
   args: {
     name: tool.schema
       .string()
       .describe("The project name to look up"),
   },
   async execute(args) {
-    return runSift(["project", "path", "--", args.name]);
+    return runSift(["project", "path", "--absolute", "--", args.name]);
   },
 });
 
@@ -326,7 +326,7 @@ export const mark = tool({
     file: tool.schema
       .string()
       .optional()
-      .describe("File path (relative to vault root) for precise targeting. Must be used with 'line'."),
+      .describe("Absolute file path for precise targeting (also accepts vault-relative). Must be used with 'line'."),
     line: tool.schema
       .number()
       .optional()
@@ -363,7 +363,7 @@ export const review = tool({
       .describe("Review the last N days (alternative to --since)"),
   },
   async execute(args) {
-    const cliArgs = ["review"];
+    const cliArgs = ["review", "--absolute"];
     if (args.days) cliArgs.push("--days", String(args.days));
     else if (args.since) cliArgs.push("--since", args.since);
     if (args.until) cliArgs.push("--until", args.until);

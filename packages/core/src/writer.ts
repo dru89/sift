@@ -109,7 +109,8 @@ export async function addTaskToFile(
   options: NewTaskOptions,
   heading?: string,
 ): Promise<string> {
-  const fullPath = path.join(config.vaultPath, filePath);
+  const normalizedPath = normalizeFilePath(config, filePath);
+  const fullPath = path.join(config.vaultPath, normalizedPath);
 
   const taskLine = formatTask({
     description: options.description,
@@ -201,7 +202,7 @@ export async function completeTask(
     if (line === undefined) {
       throw new Error("Line number is required when passing a file path");
     }
-    filePath = taskOrFile;
+    filePath = normalizeFilePath(config, taskOrFile);
     lineNum = line;
   } else {
     filePath = taskOrFile.filePath;
@@ -248,7 +249,7 @@ export async function completeTask(
  * Mark a task with any status by updating its checkbox in the file.
  *
  * @param config - The sift configuration
- * @param filePath - File path (relative to vault root)
+ * @param filePath - File path (relative to vault root, or absolute)
  * @param lineNum - The 1-indexed line number
  * @param status - The new task status to set
  * @returns The description of the updated task
@@ -259,7 +260,8 @@ export async function markTaskStatus(
   lineNum: number,
   status: TaskStatus,
 ): Promise<string> {
-  const fullPath = path.join(config.vaultPath, filePath);
+  const normalizedPath = normalizeFilePath(config, filePath);
+  const fullPath = path.join(config.vaultPath, normalizedPath);
   const content = await fs.readFile(fullPath, "utf-8");
   const lines = content.split("\n");
 
@@ -291,6 +293,17 @@ export async function markTaskStatus(
 }
 
 // ─── Internal helpers ────────────────────────────────────────
+
+/**
+ * Normalize a file path that may be absolute or vault-relative.
+ * If the path starts with the vault root, strip it to get the vault-relative path.
+ */
+function normalizeFilePath(config: SiftConfig, filePath: string): string {
+  if (path.isAbsolute(filePath) && filePath.startsWith(config.vaultPath)) {
+    return path.relative(config.vaultPath, filePath);
+  }
+  return filePath;
+}
 
 /**
  * Add a formatted task line to a daily note under "## Journal".

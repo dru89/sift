@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import chalk from "chalk";
 import { localToday, type Task, type Priority } from "@sift/core";
 
@@ -14,9 +15,19 @@ const PRIORITY_DISPLAY: Record<Priority, { label: string; color: (s: string) => 
 };
 
 /**
+ * Format options for task display.
+ */
+export interface FormatTaskOptions {
+  /** Show the file path and line number after each task. */
+  showFile?: boolean;
+  /** When set, file paths are displayed as absolute paths (joined with this vault root). */
+  vaultPath?: string;
+}
+
+/**
  * Format a single task for terminal display.
  */
-export function formatTask(task: Task, options?: { showFile?: boolean }): string {
+export function formatTask(task: Task, options?: FormatTaskOptions): string {
   const priority = PRIORITY_DISPLAY[task.priority];
   const statusIcon =
     task.status === "done" ? chalk.green("✓") :
@@ -44,7 +55,10 @@ export function formatTask(task: Task, options?: { showFile?: boolean }): string
   }
 
   if (options?.showFile) {
-    line += "  " + chalk.dim(`[${task.filePath}:${task.line}]`);
+    const displayPath = options.vaultPath
+      ? path.join(options.vaultPath, task.filePath)
+      : task.filePath;
+    line += "  " + chalk.dim(`[${displayPath}:${task.line}]`);
   }
 
   return line;
@@ -53,7 +67,7 @@ export function formatTask(task: Task, options?: { showFile?: boolean }): string
 /**
  * Format a list of tasks with a header.
  */
-export function formatTaskList(tasks: Task[], header: string, options?: { showFile?: boolean }): string {
+export function formatTaskList(tasks: Task[], header: string, options?: FormatTaskOptions): string {
   if (tasks.length === 0) {
     return `${chalk.bold(header)}\n${chalk.dim("  No tasks found.")}`;
   }

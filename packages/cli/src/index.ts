@@ -28,7 +28,7 @@ import {
   type TaskStatus,
   type SiftConfig,
 } from "@sift/core";
-import { formatTask, formatTaskList, formatSummary } from "./format.js";
+import { formatTask, formatTaskList, formatSummary, type FormatTaskOptions } from "./format.js";
 
 const program = new Command();
 
@@ -48,6 +48,7 @@ program
   .option("-p, --priority <level>", "Minimum priority: highest, high, low")
   .option("--due-before <date>", "Tasks due on or before date (YYYY-MM-DD)")
   .option("--show-file", "Show file path for each task")
+  .option("--absolute", "Show absolute file paths instead of vault-relative")
   .action(async (opts) => {
     const config = await resolveConfig();
     const tasks = await scanTasks(config, {
@@ -57,8 +58,12 @@ program
       dueBefore: opts.dueBefore,
     });
 
+    const fmtOpts: FormatTaskOptions = {
+      showFile: opts.showFile,
+      vaultPath: opts.absolute ? config.vaultPath : undefined,
+    };
     const sorted = sortByUrgency(tasks);
-    console.log(formatTaskList(sorted, "Tasks", { showFile: opts.showFile }));
+    console.log(formatTaskList(sorted, "Tasks", fmtOpts));
     console.log();
     console.log(formatSummary(await scanTasks(config)));
   });
@@ -69,12 +74,17 @@ program
   .description("Show the most important tasks to work on now")
   .option("-n, --count <number>", "Number of tasks to show", "10")
   .option("--show-file", "Show file path for each task")
+  .option("--absolute", "Show absolute file paths instead of vault-relative")
   .action(async (opts) => {
     const config = await resolveConfig();
     const count = parseInt(opts.count, 10);
     const tasks = await getNextTasks(config, count);
 
-    console.log(formatTaskList(tasks, `Next ${count} tasks`, { showFile: opts.showFile }));
+    const fmtOpts: FormatTaskOptions = {
+      showFile: opts.showFile,
+      vaultPath: opts.absolute ? config.vaultPath : undefined,
+    };
+    console.log(formatTaskList(tasks, `Next ${count} tasks`, fmtOpts));
   });
 
 // ─── sift overdue ────────────────────────────────────────────
@@ -82,11 +92,16 @@ program
   .command("overdue")
   .description("Show overdue tasks")
   .option("--show-file", "Show file path for each task")
+  .option("--absolute", "Show absolute file paths instead of vault-relative")
   .action(async (opts) => {
     const config = await resolveConfig();
     const tasks = await getOverdueTasks(config);
 
-    console.log(formatTaskList(tasks, "Overdue", { showFile: opts.showFile }));
+    const fmtOpts: FormatTaskOptions = {
+      showFile: opts.showFile,
+      vaultPath: opts.absolute ? config.vaultPath : undefined,
+    };
+    console.log(formatTaskList(tasks, "Overdue", fmtOpts));
   });
 
 // ─── sift today ──────────────────────────────────────────────
@@ -94,11 +109,16 @@ program
   .command("today")
   .description("Show tasks due today")
   .option("--show-file", "Show file path for each task")
+  .option("--absolute", "Show absolute file paths instead of vault-relative")
   .action(async (opts) => {
     const config = await resolveConfig();
     const tasks = await getDueToday(config);
 
-    console.log(formatTaskList(tasks, "Due Today", { showFile: opts.showFile }));
+    const fmtOpts: FormatTaskOptions = {
+      showFile: opts.showFile,
+      vaultPath: opts.absolute ? config.vaultPath : undefined,
+    };
+    console.log(formatTaskList(tasks, "Due Today", fmtOpts));
   });
 
 // ─── sift add ────────────────────────────────────────────────
@@ -141,6 +161,7 @@ program
   .command("find <search...>")
   .description("Search for open tasks without modifying them")
   .option("--show-file", "Show file path for each task")
+  .option("--absolute", "Show absolute file paths instead of vault-relative")
   .action(async (searchParts: string[], opts) => {
     const config = await resolveConfig();
     const search = searchParts.join(" ");
@@ -151,11 +172,15 @@ program
       return;
     }
 
+    const fmtOpts: FormatTaskOptions = {
+      showFile: opts.showFile ?? true,
+      vaultPath: opts.absolute ? config.vaultPath : undefined,
+    };
     console.log(
       formatTaskList(
         sortByUrgency(matches),
         `Found ${matches.length} task${matches.length === 1 ? "" : "s"}`,
-        { showFile: opts.showFile ?? true },
+        fmtOpts,
       ),
     );
   });
@@ -164,7 +189,7 @@ program
 program
   .command("done [search...]")
   .description("Mark a task as complete (by search or by file:line)")
-  .option("--file <path>", "File path (relative to vault root) for precise completion")
+  .option("--file <path>", "File path (relative to vault root, or absolute) for precise completion")
   .option("--line <number>", "Line number for precise completion")
   .action(async (searchParts: string[], opts) => {
     const config = await resolveConfig();
@@ -307,14 +332,16 @@ const projectCmd = program
 projectCmd
   .command("create <name...>")
   .description("Create a new project from template")
-  .action(async (nameParts: string[]) => {
+  .option("--absolute", "Show absolute file path instead of vault-relative")
+  .action(async (nameParts: string[], opts) => {
     const config = await resolveConfig();
     const name = nameParts.join(" ");
 
     try {
       const filePath = await createProject(config, name);
+      const displayPath = opts.absolute ? path.join(config.vaultPath, filePath) : filePath;
       console.log(chalk.green("✓") + ` Created project "${name}"`);
-      console.log(chalk.dim("  File: ") + filePath);
+      console.log(chalk.dim("  File: ") + displayPath);
     } catch (err: any) {
       console.error(chalk.red("Error: ") + err.message);
       process.exit(1);
@@ -379,7 +406,7 @@ program
   .command("mark [search...]")
   .description("Mark a task with a status (in_progress, on_hold, moved, cancelled, open, done)")
   .option("--status <status>", "New status: open, in_progress, on_hold, moved, cancelled, done")
-  .option("--file <path>", "File path (relative to vault root) for precise targeting")
+  .option("--file <path>", "File path (relative to vault root, or absolute) for precise targeting")
   .option("--line <number>", "Line number for precise targeting")
   .action(async (searchParts: string[], opts) => {
     const config = await resolveConfig();
@@ -451,6 +478,7 @@ program
   .option("--since <date>", "Start of review period (YYYY-MM-DD, default: last Friday)")
   .option("--until <date>", "End of review period (YYYY-MM-DD, default: today)")
   .option("--days <number>", "Review the last N days (alternative to --since)")
+  .option("--absolute", "Show absolute file paths instead of vault-relative")
   .action(async (opts) => {
     const config = await resolveConfig();
     const today = localToday();
@@ -468,6 +496,8 @@ program
     }
 
     const review = await getReviewSummary(config, since, until);
+    const resolvePath = (p: string) =>
+      opts.absolute ? path.join(config.vaultPath, p) : p;
 
     console.log(chalk.bold("📋 Review: ") + chalk.dim(`${review.since} → ${review.until}`));
     console.log();
@@ -478,7 +508,7 @@ program
       for (const task of review.completed) {
         const parts = [chalk.green("  ✓"), task.description];
         if (task.done) parts.push(chalk.dim(task.done));
-        parts.push(chalk.dim(`[${task.filePath}]`));
+        parts.push(chalk.dim(`[${resolvePath(task.filePath)}]`));
         console.log(parts.join("  "));
       }
       console.log();
@@ -490,8 +520,12 @@ program
     // Created (still open)
     if (review.created.length > 0) {
       console.log(chalk.bold.cyan(`➕ Created & still open (${review.created.length})`));
+      const fmtOpts: FormatTaskOptions = {
+        showFile: true,
+        vaultPath: opts.absolute ? config.vaultPath : undefined,
+      };
       for (const task of review.created) {
-        console.log("  " + formatTask(task, { showFile: true }));
+        console.log("  " + formatTask(task, fmtOpts));
       }
       console.log();
     }
@@ -527,9 +561,13 @@ program
     // Deferred (moved or on_hold during the period)
     if (review.deferred.length > 0) {
       console.log(chalk.bold.yellow(`⏸  Deferred (${review.deferred.length})`));
+      const fmtOpts: FormatTaskOptions = {
+        showFile: true,
+        vaultPath: opts.absolute ? config.vaultPath : undefined,
+      };
       for (const task of review.deferred) {
         const statusLabel = task.status === "on_hold" ? "on hold" : "moved";
-        console.log("  " + formatTask(task, { showFile: true }) + chalk.dim(`  [${statusLabel}]`));
+        console.log("  " + formatTask(task, fmtOpts) + chalk.dim(`  [${statusLabel}]`));
       }
       console.log();
     }
@@ -540,7 +578,7 @@ program
       for (const task of review.stale.slice(0, 10)) {
         const parts = ["  " + chalk.dim("○"), task.description];
         if (task.created) parts.push(chalk.dim(`created ${task.created}`));
-        parts.push(chalk.dim(`[${task.filePath}]`));
+        parts.push(chalk.dim(`[${resolvePath(task.filePath)}]`));
         console.log(parts.join("  "));
       }
       if (review.stale.length > 10) {
@@ -603,6 +641,7 @@ program
     const highPriority = actionableTasks.filter((t) => t.priority === "highest" || t.priority === "high");
 
     console.log(chalk.bold("📋 Sift Summary"));
+    console.log(chalk.dim(`  Vault: ${config.vaultPath}`));
     console.log();
     console.log(formatSummary(allTasks));
     console.log();

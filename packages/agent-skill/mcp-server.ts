@@ -180,7 +180,7 @@ const tools: Tool[] = [
         file: {
           type: "string",
           description:
-            "File path (relative to vault root) from sift_find output.",
+            "Absolute file path from sift_find output (also accepts vault-relative paths).",
         },
         line: {
           type: "number",
@@ -223,7 +223,7 @@ const tools: Tool[] = [
   {
     name: "sift_project_path",
     description:
-      "Get the vault-relative file path for a project. Useful when you need to read or edit a project file directly.",
+      "Get the absolute file path for a project. Useful when you need to read or edit a project file directly.",
     inputSchema: {
       type: "object",
       properties: {
@@ -314,7 +314,7 @@ const tools: Tool[] = [
         file: {
           type: "string",
           description:
-            "File path (relative to vault root) from sift_find output.",
+            "Absolute file path from sift_find output (also accepts vault-relative paths).",
         },
         line: {
           type: "number",
@@ -376,7 +376,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case "sift_list": {
-        const cliArgs = ["list", "--show-file"];
+        const cliArgs = ["list", "--show-file", "--absolute"];
         if (args?.search) cliArgs.push("--search", args.search as string);
         if (args?.priority) cliArgs.push("--priority", args.priority as string);
         if (args?.dueBefore)
@@ -389,7 +389,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_next": {
-        const cliArgs = ["next", "--show-file"];
+        const cliArgs = ["next", "--show-file", "--absolute"];
         if (args?.count) cliArgs.push("-n", String(args.count));
         const result = runSift(cliArgs);
         return {
@@ -426,7 +426,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_find": {
-        const result = runSift(["find", "--show-file", "--", args?.search as string]);
+        const result = runSift(["find", "--show-file", "--absolute", "--", args?.search as string]);
         return {
           content: [{ type: "text", text: result }],
         };
@@ -464,14 +464,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_project_create": {
-        const result = runSift(["project", "create", "--", args?.name as string]);
+        const result = runSift(["project", "create", "--absolute", "--", args?.name as string]);
         return {
           content: [{ type: "text", text: result }],
         };
       }
 
       case "sift_project_path": {
-        const result = runSift(["project", "path", "--", args?.name as string]);
+        const result = runSift(["project", "path", "--absolute", "--", args?.name as string]);
         return {
           content: [{ type: "text", text: result }],
         };
@@ -524,7 +524,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_review": {
-        const cliArgs = ["review"];
+        const cliArgs = ["review", "--absolute"];
         if (args?.days) cliArgs.push("--days", String(args.days));
         else if (args?.since) cliArgs.push("--since", args.since as string);
         if (args?.until) cliArgs.push("--until", args.until as string);
