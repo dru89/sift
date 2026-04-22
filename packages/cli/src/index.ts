@@ -308,6 +308,8 @@ program
   .option("--heading <heading>", "Heading in project file to insert link under (default: ## Notes)")
   .option("--absolute", "Show absolute file path in output")
   .option("--content <content>", "Initial content for the subnote")
+  .option("--task <description>", "Also create a task in the project linking to this subnote")
+  .option("--task-priority <priority>", "Priority for the auto-created task (highest, high, low, lowest)")
   .action(async (titleParts: string[], opts) => {
     const config = await resolveConfig();
     const title = titleParts.join(" ");
@@ -321,6 +323,8 @@ program
         type: opts.type,
         tags: opts.tags,
         heading: opts.heading,
+        task: opts.task,
+        taskPriority: opts.taskPriority as Priority | undefined,
       });
 
       const displayPath = opts.absolute
@@ -328,6 +332,9 @@ program
         : result.filePath;
       console.log(chalk.green("✓") + ` Created subnote: ${displayPath}`);
       console.log(chalk.dim(`  Linked from: ${result.project}`));
+      if (result.taskLine) {
+        console.log(chalk.dim(`  Task created: ${result.taskLine}`));
+      }
     } catch (err: any) {
       console.error(chalk.red("Error: ") + err.message);
       process.exit(1);

@@ -314,7 +314,7 @@ const tools: Tool[] = [
   {
     name: "sift_subnote",
     description:
-      "Create a new note file linked to a project. Use this instead of sift_note when the content is long (>20 lines), self-contained (design spec, meeting notes, API reference), or has a different lifecycle than the project file itself. Creates the file and inserts a wiki link in the project.",
+      "Create a new note file linked to a project. Use this instead of sift_note when the content is long (>20 lines), self-contained (design spec, meeting notes, API reference), or has a different lifecycle than the project file itself. Creates the file and inserts a wiki link in the project. Optionally creates a task linking to the subnote.",
     inputSchema: {
       type: "object",
       properties: {
@@ -350,6 +350,16 @@ const tools: Tool[] = [
           type: "string",
           description:
             "Heading in the project file to insert the backlink under. Defaults to '## Notes'.",
+        },
+        task: {
+          type: "string",
+          description:
+            "If provided, also creates a task in the project's ## Tasks section with this description, linking to the subnote. Use this when the subnote represents work to be done (e.g., 'Design HTTP API for remote access').",
+        },
+        taskPriority: {
+          type: "string",
+          enum: ["highest", "high", "low", "lowest"],
+          description: "Priority for the auto-created task. Only used when task is provided.",
         },
       },
       required: ["project", "title"],
@@ -682,6 +692,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           cliArgs.push("--tags", ...(args.tags as string[]));
         if (args?.heading)
           cliArgs.push("--heading", args.heading as string);
+        if (args?.task)
+          cliArgs.push("--task", args.task as string);
+        if (args?.taskPriority)
+          cliArgs.push("--task-priority", args.taskPriority as string);
         cliArgs.push("--", args?.title as string);
         const result = runSift(cliArgs);
         return {
