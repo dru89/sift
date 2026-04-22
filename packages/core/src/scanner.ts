@@ -105,13 +105,39 @@ export function applyFilter(tasks: Task[], filter?: TaskFilter): Task[] {
   }
 
   if (filter.search) {
-    const searchLower = filter.search.toLowerCase();
-    result = result.filter((t) =>
-      t.description.toLowerCase().includes(searchLower),
-    );
+    result = result.filter((t) => matchesSearch(t.description, filter.search!));
   }
 
   return result;
+}
+
+/**
+ * Strip markdown syntax from text for search matching.
+ * Removes wiki links ([[text]]), bold, italic, inline code, and tags.
+ */
+function stripMarkdownForSearch(text: string): string {
+  let result = text;
+  // Wiki links: [[display|target]] -> display, [[target]] -> target
+  result = result.replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, "$2");
+  // Bold/italic: **text** or __text__ or *text* or _text_
+  result = result.replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1");
+  result = result.replace(/_{1,2}([^_]+)_{1,2}/g, "$1");
+  // Inline code: `text`
+  result = result.replace(/`([^`]+)`/g, "$1");
+  // Tags: #tag-name (but not headings)
+  result = result.replace(/(?<=\s|^)#([\w-]+)/g, "$1");
+  return result;
+}
+
+/**
+ * Tokenized search: strips markdown syntax from the description, then checks
+ * that every whitespace-separated token in the search string appears somewhere
+ * in the cleaned description (case-insensitive, order-independent).
+ */
+export function matchesSearch(description: string, search: string): boolean {
+  const cleaned = stripMarkdownForSearch(description).toLowerCase();
+  const tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
+  return tokens.every((token) => cleaned.includes(token));
 }
 
 /**

@@ -3,6 +3,7 @@ export {
   scanTasks,
   scanFile,
   applyFilter,
+  matchesSearch,
   sortByUrgency,
   getNextTasks,
   getOverdueTasks,

@@ -57,6 +57,30 @@ function runSift(args: string[]): string {
   }
 }
 
+/**
+ * Run an Obsidian CLI command. Requires Obsidian to be running.
+ */
+function runObsidian(args: string[]): string {
+  try {
+    const result = execFileSync("obsidian", args, {
+      encoding: "utf-8",
+      timeout: 15000,
+    });
+    return result.trim();
+  } catch (error: any) {
+    if (error.message?.includes("ENOENT")) {
+      return "Error: Obsidian CLI is not installed. Install it in Obsidian Settings → General → Command line interface.";
+    }
+    if (error.message?.includes("ETIMEDOUT")) {
+      return "Error: Obsidian CLI timed out. Make sure Obsidian is running.";
+    }
+    // The CLI returns errors on stderr; try to extract a useful message
+    const stderr = error.stderr?.toString()?.trim();
+    if (stderr) return `Error: ${stderr}`;
+    return `Error running obsidian: ${error.message}`;
+  }
+}
+
 // Define the tools
 const tools: Tool[] = [
   {
@@ -79,9 +103,17 @@ const tools: Tool[] = [
           type: "string",
           description: "Only show tasks due on or before this date (YYYY-MM-DD)",
         },
+        scheduledBefore: {
+          type: "string",
+          description: "Only show tasks scheduled on or before this date (YYYY-MM-DD)",
+        },
         all: {
           type: "boolean",
           description: "Include completed and cancelled tasks",
+        },
+        project: {
+          type: "string",
+          description: "Only show tasks from this project's file (case-insensitive project name)",
         },
       },
     },
@@ -112,7 +144,7 @@ const tools: Tool[] = [
   {
     name: "sift_add",
     description:
-      "Add a new task to today's daily note or to a specific project in Obsidian.",
+      "Add a new task to today's daily note or to a specific project in Obsidian. Use the 'project' parameter to add directly to a project file instead of the daily note.",
     inputSchema: {
       type: "object",
       properties: {
@@ -164,7 +196,11 @@ const tools: Tool[] = [
       properties: {
         search: {
           type: "string",
-          description: "Text to search for in task descriptions",
+          description: "Text to search for in task descriptions (tokenized: each word matched independently, markdown syntax stripped)",
+        },
+        all: {
+          type: "boolean",
+          description: "Include completed and cancelled tasks (default: only open/in_progress)",
         },
       },
       required: ["search"],
@@ -186,6 +222,11 @@ const tools: Tool[] = [
           type: "number",
           description:
             "Line number (1-indexed) from sift_find output.",
+        },
+        description: {
+          type: "string",
+          description:
+            "Partial task text for safety verification. Pass a few words from the task description to confirm the right task is at this line.",
         },
       },
       required: ["file", "line"],
@@ -254,7 +295,7 @@ const tools: Tool[] = [
         heading: {
           type: "string",
           description:
-            "The heading to insert the note under. Defaults to '## Notes' for projects, '## Journal' for daily notes. Use this to target any heading in the file (e.g., '## Accomplishments', '## Meeting Notes', '## Goals'). If the heading doesn't exist, it will be created.",
+            "The heading to insert the note under. Defaults to '## Notes' for projects, '## Journal' for daily notes. Use this to target any heading in the file (e.g., '## Work Log', '## Meeting Notes', '## Goals'). If the heading doesn't exist, it will be created.",
         },
         changelogSummary: {
           type: "string",
@@ -321,6 +362,11 @@ const tools: Tool[] = [
           description:
             "Line number (1-indexed) from sift_find output.",
         },
+        description: {
+          type: "string",
+          description:
+            "Partial task text for safety verification. Pass a few words from the task description to confirm the right task is at this line.",
+        },
       },
       required: ["status", "file", "line"],
     },
@@ -345,6 +391,83 @@ const tools: Tool[] = [
           description: "Review the last N days (alternative to --since)",
         },
       },
+    },
+  },
+  // ─── Obsidian CLI tools ────────────────────────────────────
+  {
+    name: "vault_search",
+    description:
+      "Full-text search across the entire Obsidian vault. Returns matching file paths with line numbers and surrounding context. Requires Obsidian to be running.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query text.",
+        },
+        path: {
+          type: "string",
+          description:
+            "Optional folder path to limit search scope (e.g., 'Projects', 'Daily Notes').",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum number of files to return (default: no limit).",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "vault_backlinks",
+    description:
+      "List all files that link to a given file. Useful for finding related daily notes, meetings, and project references. Requires Obsidian to be running.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: {
+          type: "string",
+          description:
+            "File name to find backlinks for. Uses wikilink-style resolution (e.g., 'Sift' finds 'Projects/Sift.md').",
+        },
+        counts: {
+          type: "boolean",
+          description: "Include link counts per file.",
+        },
+      },
+      required: ["file"],
+    },
+  },
+  {
+    name: "vault_read",
+    description:
+      "Read the contents of a vault file by name (wikilink-style resolution) or exact path. Requires Obsidian to be running.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: {
+          type: "string",
+          description:
+            "File name (wikilink-style resolution, e.g., 'Sift' finds 'Projects/Sift.md') or exact path.",
+        },
+      },
+      required: ["file"],
+    },
+  },
+  {
+    name: "vault_outline",
+    description:
+      "Show the heading structure of a vault file. Returns a tree of headings with their levels. Useful for understanding file structure before reading specific sections. Requires Obsidian to be running.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: {
+          type: "string",
+          description:
+            "File name (wikilink-style resolution) or exact path.",
+        },
+      },
+      required: ["file"],
     },
   },
 ];
@@ -381,7 +504,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (args?.priority) cliArgs.push("--priority", args.priority as string);
         if (args?.dueBefore)
           cliArgs.push("--due-before", args.dueBefore as string);
+        if (args?.scheduledBefore)
+          cliArgs.push("--scheduled-before", args.scheduledBefore as string);
         if (args?.all) cliArgs.push("--all");
+        if (args?.project) cliArgs.push("--project", args.project as string);
         const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],
@@ -426,7 +552,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_find": {
-        const result = runSift(["find", "--show-file", "--absolute", "--", args?.search as string]);
+        const cliArgs = ["find", "--show-file", "--absolute"];
+        if (args?.all) cliArgs.push("--all");
+        cliArgs.push("--", args?.search as string);
+        const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],
         };
@@ -444,11 +573,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             isError: true,
           };
         }
-        const result = runSift([
+        const cliArgs = [
           "done",
           "--file", args.file as string,
           "--line", String(args.line),
-        ]);
+        ];
+        if (args.description) cliArgs.push("--description", args.description as string);
+        const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],
         };
@@ -517,6 +648,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         const cliArgs = ["mark", "--status", args?.status as string];
         cliArgs.push("--file", args.file as string, "--line", String(args.line));
+        if (args.description) cliArgs.push("--description", args.description as string);
         const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],
@@ -529,6 +661,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         else if (args?.since) cliArgs.push("--since", args.since as string);
         if (args?.until) cliArgs.push("--until", args.until as string);
         const result = runSift(cliArgs);
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      }
+
+      // ─── Obsidian CLI tools ────────────────────────────────────
+
+      case "vault_search": {
+        const cliArgs = ["search:context", `query=${args?.query as string}`, "format=json"];
+        if (args?.path) cliArgs.push(`path=${args.path as string}`);
+        if (args?.limit) cliArgs.push(`limit=${String(args.limit)}`);
+        const result = runObsidian(cliArgs);
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      }
+
+      case "vault_backlinks": {
+        const cliArgs = ["backlinks", `file=${args?.file as string}`, "format=json"];
+        if (args?.counts) cliArgs.push("counts");
+        const result = runObsidian(cliArgs);
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      }
+
+      case "vault_read": {
+        // Determine if this is a name or a path
+        const fileArg = args?.file as string;
+        const paramName = fileArg.includes("/") ? "path" : "file";
+        const result = runObsidian(["read", `${paramName}=${fileArg}`]);
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      }
+
+      case "vault_outline": {
+        const fileArg = args?.file as string;
+        const paramName = fileArg.includes("/") ? "path" : "file";
+        const result = runObsidian(["outline", `${paramName}=${fileArg}`, "format=json"]);
         return {
           content: [{ type: "text", text: result }],
         };

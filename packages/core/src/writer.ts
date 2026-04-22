@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { formatTask, statusToChar } from "./parser.js";
 import { localToday, addDays } from "./dates.js";
-import { scanTasks } from "./scanner.js";
+import { scanTasks, matchesSearch } from "./scanner.js";
 import { findProject } from "./projects.js";
 import { type Task, type TaskStatus, type Priority, type SiftConfig, ACTIONABLE_STATUSES } from "./types.js";
 
@@ -164,19 +164,22 @@ export async function addNote(
  * Returns matching tasks with full context (file path, line number, description)
  * without modifying anything. Use this to preview before completing.
  *
+ * Uses tokenized search: strips markdown syntax (wiki links, bold, etc.) and
+ * matches all whitespace-separated keywords independently (case-insensitive).
+ *
  * @param config - The sift configuration
- * @param search - Text to search for in task descriptions (case-insensitive substring match)
- * @returns Array of matching open tasks
+ * @param search - Text to search for in task descriptions
+ * @param options - Optional settings: `all` includes done/cancelled tasks
+ * @returns Array of matching tasks
  */
 export async function findTasks(
   config: SiftConfig,
   search: string,
+  options?: { all?: boolean },
 ): Promise<Task[]> {
-  const tasks = await scanTasks(config, { status: ACTIONABLE_STATUSES });
-  const searchLower = search.toLowerCase();
-  return tasks.filter((t) =>
-    t.description.toLowerCase().includes(searchLower),
-  );
+  const statusFilter = options?.all ? undefined : ACTIONABLE_STATUSES;
+  const tasks = await scanTasks(config, { status: statusFilter });
+  return tasks.filter((t) => matchesSearch(t.description, search));
 }
 
 /**
@@ -188,12 +191,14 @@ export async function findTasks(
  * @param config - The sift configuration
  * @param taskOrFile - A Task object, or a file path (relative to vault root)
  * @param line - The 1-indexed line number (required when taskOrFile is a string)
+ * @param expectedDescription - Optional partial text the task must contain (safety check against stale line numbers)
  * @returns The description of the completed task
  */
 export async function completeTask(
   config: SiftConfig,
   taskOrFile: Task | string,
   line?: number,
+  expectedDescription?: string,
 ): Promise<string> {
   let filePath: string;
   let lineNum: number;
@@ -226,6 +231,11 @@ export async function completeTask(
     );
   }
 
+  // Safety check: verify the task description matches what the caller expects
+  if (expectedDescription) {
+    verifyDescription(targetLine, expectedDescription, lineNum, filePath);
+  }
+
   const today = localToday();
 
   // Replace the checkbox and add done date
@@ -252,6 +262,7 @@ export async function completeTask(
  * @param filePath - File path (relative to vault root, or absolute)
  * @param lineNum - The 1-indexed line number
  * @param status - The new task status to set
+ * @param expectedDescription - Optional partial text the task must contain (safety check against stale line numbers)
  * @returns The description of the updated task
  */
 export async function markTaskStatus(
@@ -259,6 +270,7 @@ export async function markTaskStatus(
   filePath: string,
   lineNum: number,
   status: TaskStatus,
+  expectedDescription?: string,
 ): Promise<string> {
   const normalizedPath = normalizeFilePath(config, filePath);
   const fullPath = path.join(config.vaultPath, normalizedPath);
@@ -275,6 +287,11 @@ export async function markTaskStatus(
     throw new Error(
       `Line ${lineNum} in ${filePath} is not a task: "${targetLine.trim()}"`,
     );
+  }
+
+  // Safety check: verify the task description matches what the caller expects
+  if (expectedDescription) {
+    verifyDescription(targetLine, expectedDescription, lineNum, filePath);
   }
 
   const newChar = statusToChar(status);
@@ -295,6 +312,24 @@ export async function markTaskStatus(
 // ─── Internal helpers ────────────────────────────────────────
 
 /**
+ * Verify that a task line contains the expected description text.
+ * Uses case-insensitive matching. Throws if the text is not found.
+ */
+function verifyDescription(
+  line: string,
+  expected: string,
+  lineNum: number,
+  filePath: string,
+): void {
+  if (!line.toLowerCase().includes(expected.toLowerCase())) {
+    throw new Error(
+      `Task at line ${lineNum} in ${filePath} does not match expected description. ` +
+      `Expected to contain "${expected}" but found: "${line.trim()}"`,
+    );
+  }
+}
+
+/**
  * Normalize a file path that may be absolute or vault-relative.
  * If the path starts with the vault root, strip it to get the vault-relative path.
  */
@@ -303,6 +338,19 @@ function normalizeFilePath(config: SiftConfig, filePath: string): string {
     return path.relative(config.vaultPath, filePath);
   }
   return filePath;
+}
+
+/**
+ * Strip wiki links that reference the given name from text.
+ * Handles both `[[Name]]` and `[[Name|alias]]` forms.
+ * The link is replaced with its display text (alias if present, name otherwise),
+ * so the prose still reads naturally — only the link syntax is removed.
+ */
+function stripSelfLinks(text: string, projectName: string): string {
+  const escaped = projectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Match [[Name]] or [[Name|display text]]
+  const pattern = new RegExp(`\\[\\[${escaped}(?:\\|([^\\]]+))?\\]\\]`, "gi");
+  return text.replace(pattern, (_match, alias) => alias || projectName);
 }
 
 /**
@@ -356,11 +404,14 @@ async function addTaskToProject(
   const fullPath = path.join(config.vaultPath, project.filePath);
   let content = await fs.readFile(fullPath, "utf-8");
 
+  // Strip self-referential wiki links from the task line
+  const cleanedTaskLine = stripSelfLinks(taskLine, project.name);
+
   // Try to insert under ## Tasks, fall back to appending
-  content = insertContentUnderHeading(content, taskLine, "## Tasks", "## Changelog");
+  content = insertContentUnderHeading(content, cleanedTaskLine, "## Tasks", "## Changelog");
   await fs.writeFile(fullPath, content, "utf-8");
 
-  return taskLine;
+  return cleanedTaskLine;
 }
 
 /**
@@ -410,17 +461,22 @@ async function addNoteToProject(
   let content = await fs.readFile(fullPath, "utf-8");
 
   const heading = options.heading || "## Notes";
-  content = insertContentUnderHeading(content, options.content, heading, "## Changelog");
+
+  // Strip self-referential wiki links (e.g., [[Project Name]]) from content
+  // being written to that project's own file — they add noise, not information.
+  const noteContent = stripSelfLinks(options.content, project.name);
+  content = insertContentUnderHeading(content, noteContent, heading, "## Changelog");
 
   // Generate a changelog summary from the note content
-  const summary = options.changelogSummary || generateChangelogSummary(options.content, heading);
+  const rawSummary = options.changelogSummary || generateChangelogSummary(noteContent, heading);
+  const summary = stripSelfLinks(rawSummary, project.name);
   const today = localToday();
   const changelogLine = `- **${today}:** ${summary}`;
   content = insertContentUnderHeading(content, changelogLine, "## Changelog");
 
   await fs.writeFile(fullPath, content, "utf-8");
 
-  return options.content;
+  return noteContent;
 }
 
 /**
@@ -457,7 +513,7 @@ filename does not include ${date}
 ## Journal
 
 
-## Accomplishments
+## Work Log
 
 
 ## Tasks Created Today

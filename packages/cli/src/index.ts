@@ -47,15 +47,31 @@ program
   .option("-s, --search <text>", "Search task descriptions")
   .option("-p, --priority <level>", "Minimum priority: highest, high, low")
   .option("--due-before <date>", "Tasks due on or before date (YYYY-MM-DD)")
+  .option("--scheduled-before <date>", "Tasks scheduled on or before date (YYYY-MM-DD)")
+  .option("--project <name>", "Only show tasks from this project's file")
   .option("--show-file", "Show file path for each task")
   .option("--absolute", "Show absolute file paths instead of vault-relative")
   .action(async (opts) => {
     const config = await resolveConfig();
+
+    // Resolve --project to a filePattern
+    let filePattern: string | undefined = opts.file;
+    if (opts.project) {
+      const project = await findProject(config, opts.project);
+      if (!project) {
+        console.error(chalk.red(`Project "${opts.project}" not found.`));
+        process.exit(1);
+      }
+      filePattern = project.filePath;
+    }
+
     const tasks = await scanTasks(config, {
       status: opts.all ? undefined : "open",
       search: opts.search,
       minPriority: opts.priority as Priority | undefined,
       dueBefore: opts.dueBefore,
+      scheduledBefore: opts.scheduledBefore,
+      filePattern,
     });
 
     const fmtOpts: FormatTaskOptions = {
@@ -162,13 +178,15 @@ program
   .description("Search for open tasks without modifying them")
   .option("--show-file", "Show file path for each task")
   .option("--absolute", "Show absolute file paths instead of vault-relative")
+  .option("-a, --all", "Include completed and cancelled tasks")
   .action(async (searchParts: string[], opts) => {
     const config = await resolveConfig();
     const search = searchParts.join(" ");
-    const matches = await findTasks(config, search);
+    const matches = await findTasks(config, search, { all: opts.all });
 
     if (matches.length === 0) {
-      console.log(chalk.yellow("No open tasks matching: ") + search);
+      const scope = opts.all ? "tasks" : "open tasks";
+      console.log(chalk.yellow(`No ${scope} matching: `) + search);
       return;
     }
 
@@ -191,6 +209,7 @@ program
   .description("Mark a task as complete (by search or by file:line)")
   .option("--file <path>", "File path (relative to vault root, or absolute) for precise completion")
   .option("--line <number>", "Line number for precise completion")
+  .option("--description <text>", "Expected task text (safety check against stale line numbers)")
   .action(async (searchParts: string[], opts) => {
     const config = await resolveConfig();
 
@@ -203,7 +222,7 @@ program
       }
 
       try {
-        const description = await completeTask(config, opts.file, lineNum);
+        const description = await completeTask(config, opts.file, lineNum, opts.description);
         console.log(chalk.green("✓") + " Completed: " + description);
       } catch (err: any) {
         console.error(chalk.red("Error: ") + err.message);
@@ -408,6 +427,7 @@ program
   .option("--status <status>", "New status: open, in_progress, on_hold, moved, cancelled, done")
   .option("--file <path>", "File path (relative to vault root, or absolute) for precise targeting")
   .option("--line <number>", "Line number for precise targeting")
+  .option("--description <text>", "Expected task text (safety check against stale line numbers)")
   .action(async (searchParts: string[], opts) => {
     const config = await resolveConfig();
 
@@ -434,7 +454,7 @@ program
       }
 
       try {
-        const description = await markTaskStatus(config, opts.file, lineNum, newStatus);
+        const description = await markTaskStatus(config, opts.file, lineNum, newStatus, opts.description);
         console.log(chalk.green("✓") + ` Marked as ${newStatus}: ` + description);
       } catch (err: any) {
         console.error(chalk.red("Error: ") + err.message);
