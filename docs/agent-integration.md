@@ -2,12 +2,42 @@
 
 Sift can be integrated with AI coding agents (Claude Code, Claude Desktop, or OpenCode) so your AI assistant can read and manage your Obsidian tasks.
 
+## Quick setup
+
+### Install the agent skill
+
+The fastest way to install the sift skill for any supported agent:
+
+```bash
+npx skills add dru89/sift -g
+```
+
+The installer will prompt you to choose which agents to configure. You can also target specific agents with `--agent claude-code opencode`.
+
+### MCP server (Claude Code & Claude Desktop)
+
+For richer tool integration, sift ships an MCP server that exposes sift tools via the Model Context Protocol. This requires building the project locally.
+
+```bash
+# 1. Build everything (CLI + MCP server)
+npm install
+npm run build
+
+# 2. Link sift globally so the MCP server can find it
+npm link --workspace=packages/cli
+
+# 3. Configure your vault (if not already done)
+sift init "/path/to/your/vault"
+```
+
+Then add the MCP server to your agent's config manually (see [Configuration](#configuration) below).
+
 ## Integration types
 
 Sift supports two integration approaches:
 
-1. **MCP Server** (for Claude Code & Claude Desktop) - A Model Context Protocol server that provides sift tools
-2. **OpenCode Skill** (for OpenCode) - An agent skill + custom tools
+1. **Agent skill** (all agents) — A SKILL.md that teaches the agent about sift's tools and conventions
+2. **MCP Server** (Claude Code & Claude Desktop) — A Model Context Protocol server that provides sift tools directly
 
 All integrations provide these core tools:
 - `sift_list` - List and filter tasks
@@ -26,74 +56,28 @@ All integrations provide these core tools:
 
 Note: Tool names use underscores in MCP (e.g., `sift_project_set`) and camelCase in OpenCode (e.g., `sift_projectSet`).
 
-## Quick setup
-
-### For Claude Code & Claude Desktop
-
-```bash
-# 1. Build everything (CLI + MCP server)
-npm install
-npm run build
-
-# 2. Link sift globally so the MCP server can find it
-npm link --workspace=packages/cli
-
-# 3. Configure your vault (if not already done)
-sift init "/path/to/your/vault"
-
-# 4. Run the install script -- it writes config for both Claude Desktop and Claude Code
-./scripts/install-agent-claude.sh
-
-# 5. Restart Claude Desktop and/or Claude Code
-```
-
-The install script automatically updates:
-- Claude Desktop: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Claude Code: `~/.claude.json`
-
-### For OpenCode
-
-```bash
-# 1. Build the CLI (the tools call it under the hood)
-npm install
-npm run build
-
-# 2. Make sure sift is on your PATH
-npm link --workspace=packages/cli
-
-# 3. Configure your vault (if not already done)
-sift init "/path/to/your/vault"
-
-# 4. Install the skill and tools
-./scripts/install-agent.sh
-
-# 5. Restart OpenCode
-```
-
-The OpenCode install script copies files to:
-- `~/.config/opencode/skills/sift/SKILL.md`
-- `~/.config/opencode/tools/sift.ts`
-
 ## Keeping things up to date
 
 The canonical source files are tracked in the repo:
 
 - [`packages/agent-skill/mcp-server.ts`](../packages/agent-skill/mcp-server.ts) -- MCP server for Claude Code/Desktop
-- [`packages/agent-skill/SKILL.md`](../packages/agent-skill/SKILL.md) -- OpenCode skill definition
+- [`packages/agent-skill/SKILL.md`](../packages/agent-skill/SKILL.md) -- Agent skill definition
 - [`packages/agent-skill/tools/sift.ts`](../packages/agent-skill/tools/sift.ts) -- OpenCode custom tools
 
+The `skills/sift/` directory contains symlinks to these files for `npx skills add` compatibility.
+
 When you make changes:
+
+**For the agent skill:**
+```bash
+npx skills add dru89/sift -g -y
+# Then restart your agent
+```
 
 **For MCP server (Claude Code/Desktop):**
 ```bash
 npm run build --workspace=packages/agent-skill
 # Then restart Claude Desktop and/or Claude Code
-```
-
-**For OpenCode:**
-```bash
-./scripts/install-agent.sh
-# Then restart OpenCode
 ```
 
 ## How it works
@@ -206,7 +190,7 @@ MCP servers are configured globally in `~/.claude.json`:
 }
 ```
 
-The `install-agent-claude.sh` script writes this automatically.
+See the [Manual setup](#manual-setup) section for the full JSON format.
 
 ### OpenCode
 
@@ -224,7 +208,22 @@ You can control access to the sift skill in your `opencode.json`:
 
 ## Manual setup
 
-### For MCP Server (Claude Code/Desktop)
+### Agent skill (all agents)
+
+If you prefer to set things up manually instead of using `npx skills add`:
+
+```bash
+# Claude Code
+mkdir -p ~/.claude/skills/sift
+cp packages/agent-skill/SKILL.md ~/.claude/skills/sift/SKILL.md
+
+# OpenCode
+mkdir -p ~/.config/opencode/skills/sift
+cp packages/agent-skill/SKILL.md ~/.config/opencode/skills/sift/SKILL.md
+cp packages/agent-skill/tools/sift.ts ~/.config/opencode/tools/sift.ts
+```
+
+### MCP server (Claude Code & Claude Desktop)
 
 Build the MCP server:
 ```bash
@@ -253,15 +252,6 @@ For Claude Code, add to `~/.claude.json`:
     }
   }
 }
-```
-
-### For OpenCode
-
-Copy the files manually:
-```bash
-mkdir -p ~/.config/opencode/skills/sift
-cp packages/agent-skill/SKILL.md ~/.config/opencode/skills/sift/SKILL.md
-cp packages/agent-skill/tools/sift.ts ~/.config/opencode/tools/sift.ts
 ```
 
 ### Setting SIFT_CLI_PATH

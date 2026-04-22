@@ -106,35 +106,19 @@ Raycast will prompt you to set your vault path in the extension preferences on f
 
 ### Set up AI agent integration
 
-Sift can be integrated with AI coding agents so your assistant can read and manage tasks conversationally. Choose the setup for your tool:
+Sift can be integrated with AI coding agents so your assistant can read and manage tasks conversationally.
 
-#### For Claude Code / Claude Desktop
-
-If you use [Claude Code](https://claude.com/claude-code) (CLI) or Claude Desktop, sift runs as an MCP server.
+#### Install the agent skill
 
 ```bash
-# 1. Build the MCP server
-npm install
-npm run build
-
-# 2. Install MCP server configuration
-./scripts/install-agent-claude.sh
+npx skills add dru89/sift -g
 ```
 
-For Claude Desktop, this will show you the configuration to add. For Claude Code, follow the printed instructions.
+The installer will prompt you to choose which agents to configure (Claude Code, OpenCode, etc.).
 
-#### For OpenCode
+#### MCP server (Claude Code / Claude Desktop)
 
-If you use [OpenCode](https://opencode.ai), sift can be added as an agent skill.
-
-```bash
-# Install the skill and custom tools to ~/.config/opencode/
-./scripts/install-agent.sh
-```
-
-Then restart OpenCode.
-
-See [docs/agent-integration.md](docs/agent-integration.md) for the full setup guide for all platforms.
+For richer integration, sift also ships an MCP server. See [docs/agent-integration.md](docs/agent-integration.md) for MCP setup instructions.
 
 ## Packages
 
@@ -256,12 +240,13 @@ sift/
 │   └── agent-skill/    # AI agent integrations
 │       ├── src/
 │       │   └── mcp-server.ts  # MCP server for Claude Code/Desktop
-│       ├── SKILL.md         # OpenCode skill definition
+│       ├── SKILL.md         # Agent skill definition
 │       └── tools/
 │           └── sift.ts      # OpenCode custom tools
-├── scripts/
-│   ├── install-agent.sh         # Install OpenCode skill + tools
-│   └── install-agent-claude.sh  # Install Claude MCP server config
+├── skills/
+│   └── sift/              # Symlinks for `npx skills add`
+│       ├── SKILL.md → packages/agent-skill/SKILL.md
+│       └── tools/sift.ts → packages/agent-skill/tools/sift.ts
 ├── docs/
 │   └── agent-integration.md
 ├── AGENTS.md

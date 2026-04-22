@@ -26,17 +26,13 @@ The agent integration files are in `packages/agent-skill/`:
 
 **MCP Server (for Claude Code & Claude Desktop):**
 - `packages/agent-skill/mcp-server.ts` -- MCP server providing sift tools
-- Installed via `./scripts/install-agent-claude.sh`
 - Tools: `sift_list`, `sift_next`, `sift_summary`, `sift_add`, `sift_find`, `sift_done`, `sift_projects`, `sift_project_create`, `sift_project_path`, `sift_note`, `sift_review`
 
-**Claude Code Skill:**
-- `packages/agent-skill/SKILL.md` -- Skill definition (shared with OpenCode)
-- Installed to `~/.claude/skills/sift/` via `./scripts/install-agent-claude.sh`
-
-**OpenCode Skill:**
-- `packages/agent-skill/SKILL.md` -- Skill definition (shared with Claude Code)
-- `packages/agent-skill/tools/sift.ts` -- Custom tools
-- Installed to `~/.config/opencode/` via `./scripts/install-agent.sh`
+**Agent Skill (all agents):**
+- `packages/agent-skill/SKILL.md` -- Skill definition
+- `packages/agent-skill/tools/sift.ts` -- OpenCode custom tools
+- `skills/sift/` -- Symlinks for `npx skills add dru89/sift` compatibility
+- Install via `npx skills add dru89/sift -g`
 
 Both implementations resolve the CLI dynamically (from PATH or `SIFT_CLI_PATH` env var) rather than hardcoding a path.
 
