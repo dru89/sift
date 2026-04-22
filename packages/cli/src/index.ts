@@ -269,7 +269,6 @@ program
   .description("Add a note to today's daily note or to a project")
   .option("--project <name>", "Add note to a project instead of daily note")
   .option("--heading <heading>", "Target heading (default: '## Journal' for daily, '## Notes' for projects)")
-  .option("--changelog-summary <summary>", "Explicit changelog entry summary (auto-generated if omitted)")
   .option("--date <date>", "Target daily note date (YYYY-MM-DD, default: today)")
   .action(async (contentParts: string[], opts) => {
     const config = await resolveConfig();
@@ -280,7 +279,6 @@ program
         content,
         project: opts.project,
         heading: opts.heading,
-        changelogSummary: opts.changelogSummary,
         date: opts.date,
       });
 

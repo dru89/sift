@@ -279,7 +279,7 @@ const tools: Tool[] = [
   {
     name: "sift_note",
     description:
-      "Add a freeform note to today's daily note or to a project. For projects, also adds a changelog entry.",
+      "Add a freeform note to today's daily note or to a project.",
     inputSchema: {
       type: "object",
       properties: {
@@ -296,11 +296,6 @@ const tools: Tool[] = [
           type: "string",
           description:
             "The heading to insert the note under. Defaults to '## Notes' for projects, '## Journal' for daily notes. Use this to target any heading in the file (e.g., '## Work Log', '## Meeting Notes', '## Goals'). If the heading doesn't exist, it will be created.",
-        },
-        changelogSummary: {
-          type: "string",
-          description:
-            "A short one-liner for the changelog entry (e.g. 'Decided to use ID3v2.4 format'). Always provide this when adding a note to a project — do not rely on the auto-generated default.",
         },
         date: {
           type: "string",
@@ -658,8 +653,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           cliArgs.push("--project", args.project as string);
         if (args?.heading)
           cliArgs.push("--heading", args.heading as string);
-        if (args?.changelogSummary)
-          cliArgs.push("--changelog-summary", args.changelogSummary as string);
         if (args?.date)
           cliArgs.push("--date", args.date as string);
         cliArgs.push("--", args?.content as string);

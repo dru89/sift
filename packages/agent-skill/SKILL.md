@@ -245,23 +245,20 @@ Use `sift_review` to generate a review summary for any time period. It defaults 
 - User asks "review March" -- use `since` and `until` for the month range
 - User wants to reflect on recent progress across projects
 
-### Changelog tracking
+### Project changelogs
 
-When you add a note to a project using `sift_note`, a changelog entry is automatically appended under a `## Changelog` heading in the project file. The changelog entry is a dated one-liner summarizing the note:
+Project files may have a `## Changelog` section with dated summary entries. These are **not auto-generated** — they are written deliberately during periodic reviews (weekly, milestone, etc.) to summarize meaningful progress.
 
+**Do not append changelog entries when adding notes to projects.** `sift_note` adds content under the target heading and nothing else.
+
+**When to write a changelog entry:** During a weekly review or when a significant milestone is reached, use `sift_note` with `heading: "## Changelog"` to add a summary line like:
 ```
-## Changelog
-- **2026-03-10:** Decided to use ID3v2.4 format
-- **2026-03-08:** Added initial research notes
+- **2026-04-22:** Shipped remote access design, added vault search tools, cleaned up dead links
 ```
 
-This happens automatically -- you don't need to do anything special. The changelog provides a lightweight activity log that the review command can aggregate across all projects.
+The review system (`sift_review`) aggregates existing changelog entries across projects for the review period.
 
-**Notes about changelog:**
-- Only notes create changelog entries, not tasks (tasks already have `➕` created dates)
-- Always pass a `changelogSummary` when calling `sift_note` — write a short, meaningful one-liner that captures the essence of the note (e.g. "Decided to use ID3v2.4 format", "Switched auth strategy to JWT"). Don't rely on the default, which just truncates the raw note content.
-- Keep changelog entries at session-summary level, not per-action. If you add multiple notes to the same project in one session, the last changelog entry should summarize the session's work, not each individual note.
-- Self-referential wiki links (e.g., `[[Project Name]]` in content written to that project's own file) are automatically stripped — you don't need to avoid them manually.
+**Self-referential wiki links** (e.g., `[[Project Name]]` in content written to that project's own file) are automatically stripped — you don't need to avoid them manually.
 
 ## CWD project context
 
