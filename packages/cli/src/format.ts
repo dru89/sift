@@ -96,6 +96,7 @@ export function formatSummary(tasks: Task[]): string {
   const actionable = (t: Task) => t.status === "open" || t.status === "in_progress";
   const overdue = tasks.filter((t) => actionable(t) && t.due !== null && t.due < today).length;
   const dueToday = tasks.filter((t) => actionable(t) && t.due === today).length;
+  const notYetStartable = tasks.filter((t) => actionable(t) && isNotYetStartable(t, today)).length;
 
   const parts: string[] = [
     `${chalk.bold(String(open))} open`,
@@ -110,6 +111,9 @@ export function formatSummary(tasks: Task[]): string {
   }
   if (dueToday > 0) {
     parts.push(`${chalk.yellow(String(dueToday))} due today`);
+  }
+  if (notYetStartable > 0) {
+    parts.push(`${chalk.dim(String(notYetStartable))} not yet startable`);
   }
 
   return parts.join("  ·  ");

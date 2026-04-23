@@ -56,6 +56,14 @@ export const list = tool({
       .string()
       .optional()
       .describe("Only show tasks scheduled on or before this date (YYYY-MM-DD)"),
+    startBefore: tool.schema
+      .string()
+      .optional()
+      .describe("Only show tasks with a start date on or before this date (YYYY-MM-DD)"),
+    startAfter: tool.schema
+      .string()
+      .optional()
+      .describe("Only show tasks with a start date on or after this date (YYYY-MM-DD)"),
     all: tool.schema
       .boolean()
       .optional()
@@ -71,6 +79,8 @@ export const list = tool({
     if (args.priority) cliArgs.push("--priority", args.priority);
     if (args.dueBefore) cliArgs.push("--due-before", args.dueBefore);
     if (args.scheduledBefore) cliArgs.push("--scheduled-before", args.scheduledBefore);
+    if (args.startBefore) cliArgs.push("--start-before", args.startBefore);
+    if (args.startAfter) cliArgs.push("--start-after", args.startAfter);
     if (args.all) cliArgs.push("--all");
     if (args.project) cliArgs.push("--project", args.project);
     return runSift(cliArgs);
@@ -95,7 +105,7 @@ export const next = tool({
 
 export const summary = tool({
   description:
-    "Quick overview of task status: open count, overdue, due today, high priority, and what's up next.",
+    "Quick overview of task status: open count, overdue, due today, high priority, not yet startable, and what's up next.",
   args: {},
   async execute() {
     return runSift(["summary"]);

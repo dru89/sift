@@ -50,6 +50,8 @@ program
   .option("-p, --priority <level>", "Minimum priority: highest, high, low")
   .option("--due-before <date>", "Tasks due on or before date (YYYY-MM-DD)")
   .option("--scheduled-before <date>", "Tasks scheduled on or before date (YYYY-MM-DD)")
+  .option("--start-before <date>", "Tasks with start date on or before date (YYYY-MM-DD)")
+  .option("--start-after <date>", "Tasks with start date on or after date (YYYY-MM-DD)")
   .option("--project <name>", "Only show tasks from this project's file")
   .option("--show-file", "Show file path for each task")
   .option("--absolute", "Show absolute file paths instead of vault-relative")
@@ -73,6 +75,8 @@ program
       minPriority: opts.priority as Priority | undefined,
       dueBefore: opts.dueBefore,
       scheduledBefore: opts.scheduledBefore,
+      startBefore: opts.startBefore,
+      startAfter: opts.startAfter,
       filePattern,
     });
 

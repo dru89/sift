@@ -12,9 +12,9 @@ I help you interact with the user's Obsidian Tasks via the `sift` CLI tool and c
 The following custom tools are available for interacting with the user's tasks and vault:
 
 **Task management:**
-- **`sift_list`** - List open tasks, optionally filtered by search text, priority, due/scheduled date, or project/area
-- **`sift_next`** - Get the most important tasks to work on right now (sorted by priority + urgency)
-- **`sift_summary`** - Quick overview: open count, overdue, due today, high priority, and up next
+- **`sift_list`** - List open tasks, optionally filtered by search text, priority, due/scheduled/start date, or project/area
+- **`sift_next`** - Get the most important tasks to work on right now (sorted by priority + urgency; future-start tasks are deprioritized)
+- **`sift_summary`** - Quick overview: open count, overdue, due today, high priority, not yet startable, and up next
 - **`sift_add`** - Add a new task to today's daily note, or to a specific project/area
 - **`sift_find`** - Search for tasks without modifying them (use before `sift_done` or `sift_mark`; pass `all: true` to include completed/cancelled)
 - **`sift_done`** - Mark a task as complete (requires file+line from `sift_find`; confirm with user first; pass `description` for safety)
