@@ -262,6 +262,26 @@ const tools: Tool[] = [
           type: "string",
           description: "The project name (becomes the filename)",
         },
+        status: {
+          type: "string",
+          description: "Initial project status (e.g. active, planning, someday)",
+        },
+        area: {
+          type: "string",
+          description: "Parent area name to associate the project with",
+        },
+        tags: {
+          type: "string",
+          description: "Comma-separated tags (e.g. '#work,#personal')",
+        },
+        content: {
+          type: "string",
+          description: "Initial overview content for the project file",
+        },
+        frontmatter: {
+          type: "string",
+          description: "Additional frontmatter fields as a JSON string",
+        },
       },
       required: ["name"],
     },
@@ -365,6 +385,18 @@ const tools: Tool[] = [
         name: {
           type: "string",
           description: "The area name (becomes the filename)",
+        },
+        tags: {
+          type: "string",
+          description: "Comma-separated tags (e.g. '#work,#personal')",
+        },
+        content: {
+          type: "string",
+          description: "Initial overview content for the area file",
+        },
+        frontmatter: {
+          type: "string",
+          description: "Additional frontmatter fields as a JSON string",
         },
       },
       required: ["name"],
@@ -670,7 +702,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_project_create": {
-        const result = runSift(["project", "create", "--absolute", "--", args?.name as string]);
+        const cliArgs = ["project", "create", "--absolute"];
+        if (args?.status) cliArgs.push("--status", args.status as string);
+        if (args?.area) cliArgs.push("--area", args.area as string);
+        if (args?.tags) cliArgs.push("--tags", args.tags as string);
+        if (args?.content) cliArgs.push("--content", args.content as string);
+        if (args?.frontmatter) cliArgs.push("--frontmatter", args.frontmatter as string);
+        cliArgs.push("--", args?.name as string);
+        const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],
         };
@@ -684,7 +723,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "sift_area_create": {
-        const result = runSift(["area", "create", "--absolute", "--", args?.name as string]);
+        const cliArgs = ["area", "create", "--absolute"];
+        if (args?.tags) cliArgs.push("--tags", args.tags as string);
+        if (args?.content) cliArgs.push("--content", args.content as string);
+        if (args?.frontmatter) cliArgs.push("--frontmatter", args.frontmatter as string);
+        cliArgs.push("--", args?.name as string);
+        const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],
         };

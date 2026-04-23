@@ -275,9 +275,36 @@ export const project_create = tool({
     name: tool.schema
       .string()
       .describe("The project name (becomes the filename)"),
+    status: tool.schema
+      .string()
+      .optional()
+      .describe("Initial project status (e.g. active, planning, someday)"),
+    area: tool.schema
+      .string()
+      .optional()
+      .describe("Parent area name to associate the project with"),
+    tags: tool.schema
+      .string()
+      .optional()
+      .describe("Comma-separated tags (e.g. '#work,#personal')"),
+    content: tool.schema
+      .string()
+      .optional()
+      .describe("Initial overview content for the project file"),
+    frontmatter: tool.schema
+      .string()
+      .optional()
+      .describe("Additional frontmatter fields as a JSON string"),
   },
   async execute(args) {
-    return runSift(["project", "create", "--absolute", "--", args.name]);
+    const cliArgs = ["project", "create", "--absolute"];
+    if (args.status) cliArgs.push("--status", args.status);
+    if (args.area) cliArgs.push("--area", args.area);
+    if (args.tags) cliArgs.push("--tags", args.tags);
+    if (args.content) cliArgs.push("--content", args.content);
+    if (args.frontmatter) cliArgs.push("--frontmatter", args.frontmatter);
+    cliArgs.push("--", args.name);
+    return runSift(cliArgs);
   },
 });
 
@@ -300,9 +327,26 @@ export const area_create = tool({
     name: tool.schema
       .string()
       .describe("The area name (becomes the filename)"),
+    tags: tool.schema
+      .string()
+      .optional()
+      .describe("Comma-separated tags (e.g. '#work,#personal')"),
+    content: tool.schema
+      .string()
+      .optional()
+      .describe("Initial overview content for the area file"),
+    frontmatter: tool.schema
+      .string()
+      .optional()
+      .describe("Additional frontmatter fields as a JSON string"),
   },
   async execute(args) {
-    return runSift(["area", "create", "--absolute", "--", args.name]);
+    const cliArgs = ["area", "create", "--absolute"];
+    if (args.tags) cliArgs.push("--tags", args.tags);
+    if (args.content) cliArgs.push("--content", args.content);
+    if (args.frontmatter) cliArgs.push("--frontmatter", args.frontmatter);
+    cliArgs.push("--", args.name);
+    return runSift(cliArgs);
   },
 });
 

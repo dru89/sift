@@ -418,12 +418,23 @@ projectCmd
   .command("create <name...>")
   .description("Create a new project from template")
   .option("--absolute", "Show absolute file path instead of vault-relative")
+  .option("--status <status>", "Initial project status")
+  .option("--area <area>", "Parent area name")
+  .option("--tags <tags>", "Comma-separated tags")
+  .option("--content <content>", "Initial overview content")
+  .option("--frontmatter <json>", "Additional frontmatter as JSON")
   .action(async (nameParts: string[], opts) => {
     const config = await resolveConfig();
     const name = nameParts.join(" ");
 
     try {
-      const filePath = await createProject(config, name);
+      const filePath = await createProject(config, name, {
+        status: opts.status,
+        area: opts.area,
+        tags: opts.tags ? (opts.tags as string).split(",").map((t: string) => t.trim()) : undefined,
+        content: opts.content,
+        frontmatter: opts.frontmatter ? JSON.parse(opts.frontmatter) : undefined,
+      });
       const displayPath = opts.absolute ? path.join(config.vaultPath, filePath) : filePath;
       console.log(chalk.green("✓") + ` Created project "${name}"`);
       console.log(chalk.dim("  File: ") + displayPath);
@@ -495,12 +506,19 @@ areaCmd
   .command("create <name...>")
   .description("Create a new area from template")
   .option("--absolute", "Show absolute file path instead of vault-relative")
+  .option("--tags <tags>", "Comma-separated tags")
+  .option("--content <content>", "Initial overview content")
+  .option("--frontmatter <json>", "Additional frontmatter as JSON")
   .action(async (nameParts: string[], opts) => {
     const config = await resolveConfig();
     const name = nameParts.join(" ");
 
     try {
-      const filePath = await createArea(config, name);
+      const filePath = await createArea(config, name, {
+        tags: opts.tags ? (opts.tags as string).split(",").map((t: string) => t.trim()) : undefined,
+        content: opts.content,
+        frontmatter: opts.frontmatter ? JSON.parse(opts.frontmatter) : undefined,
+      });
       const displayPath = opts.absolute ? path.join(config.vaultPath, filePath) : filePath;
       console.log(chalk.green("✓") + ` Created area "${name}"`);
       console.log(chalk.dim("  File: ") + displayPath);

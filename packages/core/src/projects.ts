@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { glob } from "glob";
 import { type SiftConfig, type ProjectInfo, type ItemKind } from "./types.js";
 import { localToday } from "./dates.js";
+import { insertContentUnderHeading } from "./writer.js";
 
 /** Return a string value from a frontmatter field, or undefined if blank/array. */
 function scalar(val: unknown): string | undefined {
@@ -111,16 +112,34 @@ export async function findProject(
 }
 
 /**
+ * Options for creating a new project or area.
+ */
+export interface CreateItemOptions {
+  /** Initial content to insert under ## Overview */
+  content?: string;
+  /** Project status (projects only) */
+  status?: string;
+  /** Parent area name (projects only) */
+  area?: string;
+  /** Tags to set in frontmatter */
+  tags?: string[];
+  /** Additional frontmatter fields to merge (key-value pairs) */
+  frontmatter?: Record<string, string | string[]>;
+}
+
+/**
  * Create a new project file from the configured template.
  *
  * @param config - The sift configuration
  * @param name - The project name (becomes the filename)
+ * @param options - Optional initial content and frontmatter
  * @returns The file path (relative to vault root) of the created project
  * @throws If the project already exists
  */
 export async function createProject(
   config: SiftConfig,
   name: string,
+  options?: CreateItemOptions,
 ): Promise<string> {
   const filePath = path.join(config.projectsPath, `${name}.md`);
   const fullPath = path.join(config.vaultPath, filePath);
@@ -143,12 +162,26 @@ export async function createProject(
     const template = await fs.readFile(templatePath, "utf-8");
     content = stripTemplaterSyntax(template);
   } catch {
-    // Template doesn't exist, use a sensible default
     content = getDefaultProjectTemplate();
   }
 
-  // Inject today's date as the created field
+  // Inject standard fields
   content = injectFrontmatterField(content, "created", localToday());
+  if (options?.status) content = injectFrontmatterField(content, "status", options.status);
+  if (options?.area) content = injectFrontmatterField(content, "area", `"[[${options.area}]]"`);
+  if (options?.tags && options.tags.length > 0) content = injectFrontmatterField(content, "tags", options.tags);
+
+  // Merge any additional frontmatter
+  if (options?.frontmatter) {
+    for (const [key, value] of Object.entries(options.frontmatter)) {
+      content = injectFrontmatterField(content, key, value);
+    }
+  }
+
+  // Insert overview content
+  if (options?.content) {
+    content = insertContentUnderHeading(content, options.content, "## Overview");
+  }
 
   await fs.writeFile(fullPath, content, "utf-8");
   return filePath;
@@ -159,12 +192,14 @@ export async function createProject(
  *
  * @param config - The sift configuration
  * @param name - The area name (becomes the filename)
+ * @param options - Optional initial content and frontmatter
  * @returns The file path (relative to vault root) of the created area
  * @throws If the area already exists
  */
 export async function createArea(
   config: SiftConfig,
   name: string,
+  options?: CreateItemOptions,
 ): Promise<string> {
   const filePath = path.join(config.areasPath, `${name}.md`);
   const fullPath = path.join(config.vaultPath, filePath);
@@ -193,8 +228,21 @@ export async function createArea(
     content = getDefaultAreaTemplate(name);
   }
 
-  // Inject today's date as the created field
+  // Inject standard fields
   content = injectFrontmatterField(content, "created", localToday());
+  if (options?.tags && options.tags.length > 0) content = injectFrontmatterField(content, "tags", options.tags);
+
+  // Merge any additional frontmatter
+  if (options?.frontmatter) {
+    for (const [key, value] of Object.entries(options.frontmatter)) {
+      content = injectFrontmatterField(content, key, value);
+    }
+  }
+
+  // Insert overview content
+  if (options?.content) {
+    content = insertContentUnderHeading(content, options.content, "## Overview");
+  }
 
   await fs.writeFile(fullPath, content, "utf-8");
   return filePath;

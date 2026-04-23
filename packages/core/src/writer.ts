@@ -672,7 +672,7 @@ SORT file.ctime DESC
  * Supports multi-line content: each line is inserted as a separate line
  * in the file.
  */
-function insertContentUnderHeading(
+export function insertContentUnderHeading(
   fileContent: string,
   newContent: string,
   heading: string,
