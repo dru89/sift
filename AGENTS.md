@@ -31,8 +31,8 @@ The agent integration files are in `packages/agent-skill/`:
 **Agent Skill (all agents):**
 - `packages/agent-skill/SKILL.md` -- Skill definition
 - `packages/agent-skill/tools/sift.ts` -- OpenCode custom tools
-- `skills/sift/` -- Symlinks for `npx skills add dru89/sift` compatibility
-- Install via `npx skills add dru89/sift -g`
+- Install via `npx skills add dru89/sift -g` (from GitHub)
+- **During development:** `npx skills add ~/Developer/github.com/dru89/sift -g -y` (from local working tree). This copies files, so re-run after changing skill files.
 
 Both implementations resolve the CLI dynamically (from PATH or `SIFT_CLI_PATH` env var) rather than hardcoding a path.
 
