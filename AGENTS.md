@@ -13,9 +13,10 @@ This is a TypeScript monorepo using npm workspaces.
 ```
 sift/
 ├── packages/
-│   ├── core/       # Shared library: parser, scanner, writer, config
-│   ├── cli/        # Command-line interface (commander.js)
-│   └── raycast/    # Raycast extension (React + @raycast/api)
+│   ├── core/        # Shared library: parser, scanner, writer, config
+│   ├── cli/         # Command-line interface (commander.js)
+│   ├── agent-skill/ # MCP server, OpenCode tools, SKILL.md
+│   └── raycast/     # Raycast extension (React + @raycast/api)
 ```
 
 All interfaces depend on `@sift/core`. The core package has zero UI concerns -- it reads/writes markdown files and returns structured data.
@@ -26,7 +27,7 @@ The agent integration files are in `packages/agent-skill/`:
 
 **MCP Server (for Claude Code & Claude Desktop):**
 - `packages/agent-skill/mcp-server.ts` -- MCP server providing sift tools
-- Tools: `sift_list`, `sift_next`, `sift_summary`, `sift_add`, `sift_find`, `sift_done`, `sift_projects`, `sift_project_create`, `sift_project_path`, `sift_note`, `sift_review`
+- Tools: `sift_list`, `sift_next`, `sift_summary`, `sift_add`, `sift_find`, `sift_done`, `sift_mark`, `sift_projects`, `sift_project_create`, `sift_project_path`, `sift_project_set`, `sift_note`, `sift_subnote`, `sift_area_create`, `sift_area_path`, `sift_review`, `vault_search`, `vault_backlinks`, `vault_read`, `vault_outline`
 
 **Agent Skill (all agents):**
 - `packages/agent-skill/SKILL.md` -- Skill definition
@@ -68,7 +69,9 @@ The config file looks like:
   "dailyNotesFormat": "YYYY-MM-DD",
   "excludeFolders": ["Templates", "Attachments"],
   "projectsPath": "Projects",
-  "projectTemplatePath": "Templates/Project.md"
+  "projectTemplatePath": "Templates/Project.md",
+  "areasPath": "Areas",
+  "areaTemplatePath": "Templates/Area.md"
 }
 ```
 
@@ -87,7 +90,7 @@ The scanner (`packages/core/src/scanner.ts`) walks all `.md` files in the vault,
 
 New tasks are added under the `## Journal` heading in today's daily note. If the daily note doesn't exist, it's created from a template that matches the user's existing format (frontmatter, tasks query block, journal section, dataview query, navigation links).
 
-Tasks can also be added to project files using `addTask()` with the `project` option (or `sift add --project`). When targeting a project, the task is inserted under the `## Tasks` heading in the project file.
+Tasks can also be added to project or area files using `addTask()` with the `project` option (or `sift add --project`). When targeting a project or area, the task is inserted under the `## Tasks` heading in the file.
 
 ### Projects
 
@@ -95,7 +98,16 @@ Projects are markdown files in the configured `projectsPath` folder (default: `P
 
 - `listProjects()` -- scans the projects folder and returns metadata for all project files
 - `findProject()` -- case-insensitive lookup by name
-- `createProject()` -- creates a new project file from the configured template (stripping Templater syntax)
+- `createProject()` -- creates a new project file from the configured template (stripping Templater syntax). Accepts an optional `CreateItemOptions` with content, status, area, tags, and frontmatter.
+
+### Areas
+
+Areas are persistent responsibilities with no finish line -- things like "Incident Management" or "Sift" that you maintain indefinitely. They have `type: area` in their YAML frontmatter and live in the configured `areasPath` folder (default: `Areas/`).
+
+- `listProjects()` scans both the `projectsPath` and `areasPath` folders. It returns `ProjectInfo` objects with a `kind` field (`"project" | "area"`) so callers can distinguish them.
+- `createArea()` creates a new area file from the configured area template. Like `createProject()`, it accepts an optional `CreateItemOptions`.
+- `findProject()` finds both projects and areas by name (case-insensitive).
+- The `area` frontmatter field on projects links a project to its parent area (e.g., `area: Sift`).
 
 ### Safe task completion
 
@@ -108,17 +120,7 @@ The CLI `sift done` command supports both modes: search-based (`sift done "searc
 
 ### Notes and changelog
 
-Freeform notes (not tasks) can be added with `addNote()` or `sift note`. Notes go under `## Journal` in the daily note by default, or `## Notes` in project files.
-
-When a note is added to a project, a one-line dated summary is automatically appended under `## Changelog` in the project file:
-
-```markdown
-## Changelog
-- **2026-03-10:** Decided to use ID3v2.4 format
-- **2026-03-08:** Added initial research notes
-```
-
-Only notes create changelog entries (not tasks). The summary is auto-generated from the first ~80 characters of the note content, or can be explicitly provided via `changelogSummary` in `AddNoteOptions`.
+Freeform notes (not tasks) can be added with `addNote()` or `sift note`. Notes go under `## Journal` in the daily note by default, or under the target heading (default `## Notes`) in project and area files. Changelog entries are NOT auto-generated -- they are written deliberately during reviews via `sift note --heading '## Changelog'`.
 
 ### Review
 
@@ -157,14 +159,14 @@ Pure library, no CLI or UI. Key exports:
 
 - **Parser**: `parseLine()`, `parseContent()`, `formatTask()`
 - **Scanner**: `scanTasks()`, `scanFile()`, `getNextTasks()`, `getOverdueTasks()`, `getDueToday()`, `sortByUrgency()`, `getReviewSummary()`, `scanChangelog()`
-- **Writer**: `addTask()`, `addTaskToFile()`, `addNote()`, `completeTask()`, `findTasks()`
-- **Projects**: `listProjects()`, `findProject()`, `createProject()`
+- **Writer**: `addTask()`, `addTaskToFile()`, `addNote()`, `completeTask()`, `findTasks()`, `createSubnote()`, `markTaskStatus()`, `insertContentUnderHeading()`
+- **Projects**: `listProjects()`, `findProject()`, `createProject()`, `createArea()`, `setProjectField()`
 - **Config**: `resolveConfig()`, `writeConfig()`
-- **Types**: `Task`, `TaskStatus`, `Priority`, `SiftConfig`, `TaskFilter`, `NewTaskOptions`, `AddNoteOptions`, `ProjectInfo`, `ChangelogEntry`, `ReviewSummary`
+- **Types**: `Task`, `TaskStatus`, `Priority`, `SiftConfig`, `TaskFilter`, `NewTaskOptions`, `AddNoteOptions`, `ProjectInfo`, `ItemKind`, `CreateItemOptions`, `CreateSubnoteOptions`, `SubnoteResult`, `ChangelogEntry`, `ReviewSummary`
 
 ### @sift/cli (`packages/cli/`)
 
-Commands: `list`, `next`, `today`, `overdue`, `add`, `done`, `find`, `note`, `review`, `projects`, `project create`, `project path`, `summary`, `init`
+Commands: `list`, `next`, `today`, `overdue`, `add`, `done`, `find`, `note`, `subnote`, `mark`, `review`, `projects`, `project create`, `project path`, `project set`, `area create`, `area path`, `summary`, `init`
 
 Uses commander.js for arg parsing and chalk for terminal output.
 
