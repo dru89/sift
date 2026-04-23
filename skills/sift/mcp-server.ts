@@ -280,11 +280,11 @@ const tools: Tool[] = [
         },
         tags: {
           type: "string",
-          description: "Comma-separated tags (e.g. '#work,#personal')",
+          description: "Comma-separated tags without # prefix (e.g. 'work,personal')",
         },
         content: {
           type: "string",
-          description: "Initial overview content for the project file",
+          description: "Initial overview content inserted under ## Overview. Do not include '## Overview' in the content itself.",
         },
         frontmatter: {
           type: "string",
@@ -396,11 +396,11 @@ const tools: Tool[] = [
         },
         tags: {
           type: "string",
-          description: "Comma-separated tags (e.g. '#work,#personal')",
+          description: "Comma-separated tags without # prefix (e.g. 'work,personal')",
         },
         content: {
           type: "string",
-          description: "Initial overview content for the area file",
+          description: "Initial overview content inserted under ## Overview. Do not include '## Overview' in the content itself.",
         },
         frontmatter: {
           type: "string",

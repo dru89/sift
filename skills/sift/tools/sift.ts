@@ -264,11 +264,11 @@ export const project_create = tool({
     tags: tool.schema
       .string()
       .optional()
-      .describe("Comma-separated tags (e.g. '#work,#personal')"),
+      .describe("Comma-separated tags without # prefix (e.g. 'work,personal')"),
     content: tool.schema
       .string()
       .optional()
-      .describe("Initial overview content for the project file"),
+      .describe("Initial overview content inserted under ## Overview. Do not include '## Overview' in the content itself."),
     frontmatter: tool.schema
       .string()
       .optional()
@@ -308,11 +308,11 @@ export const area_create = tool({
     tags: tool.schema
       .string()
       .optional()
-      .describe("Comma-separated tags (e.g. '#work,#personal')"),
+      .describe("Comma-separated tags without # prefix (e.g. 'work,personal')"),
     content: tool.schema
       .string()
       .optional()
-      .describe("Initial overview content for the area file"),
+      .describe("Initial overview content inserted under ## Overview. Do not include '## Overview' in the content itself."),
     frontmatter: tool.schema
       .string()
       .optional()

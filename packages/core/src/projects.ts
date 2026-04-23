@@ -111,6 +111,20 @@ export async function findProject(
   return projects.find((p) => p.name.toLowerCase() === lower) || null;
 }
 
+/** Strip leading `#` from each tag — frontmatter tags don't use the `#` prefix. */
+function normalizeTags(tags: string[]): string[] {
+  return tags.map((t) => (t.startsWith("#") ? t.slice(1) : t));
+}
+
+/**
+ * Strip a leading heading line from content if it matches the target heading.
+ * Agents sometimes include the heading in the content, duplicating the template.
+ */
+function stripLeadingHeading(content: string, heading: string): string {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return content.replace(new RegExp(`^${escaped}\\s*\\n?`), "").trimStart();
+}
+
 /**
  * Options for creating a new project or area.
  */
@@ -169,7 +183,7 @@ export async function createProject(
   content = injectFrontmatterField(content, "created", localToday());
   if (options?.status) content = injectFrontmatterField(content, "status", options.status);
   if (options?.area) content = injectFrontmatterField(content, "area", `"[[${options.area}]]"`);
-  if (options?.tags && options.tags.length > 0) content = injectFrontmatterField(content, "tags", options.tags);
+  if (options?.tags && options.tags.length > 0) content = injectFrontmatterField(content, "tags", normalizeTags(options.tags));
 
   // Merge any additional frontmatter
   if (options?.frontmatter) {
@@ -178,9 +192,9 @@ export async function createProject(
     }
   }
 
-  // Insert overview content
+  // Insert overview content, stripping any leading "## Overview" the caller included
   if (options?.content) {
-    content = insertContentUnderHeading(content, options.content, "## Overview");
+    content = insertContentUnderHeading(content, stripLeadingHeading(options.content, "## Overview"), "## Overview");
   }
 
   await fs.writeFile(fullPath, content, "utf-8");
@@ -230,7 +244,7 @@ export async function createArea(
 
   // Inject standard fields
   content = injectFrontmatterField(content, "created", localToday());
-  if (options?.tags && options.tags.length > 0) content = injectFrontmatterField(content, "tags", options.tags);
+  if (options?.tags && options.tags.length > 0) content = injectFrontmatterField(content, "tags", normalizeTags(options.tags));
 
   // Merge any additional frontmatter
   if (options?.frontmatter) {
@@ -239,9 +253,9 @@ export async function createArea(
     }
   }
 
-  // Insert overview content
+  // Insert overview content, stripping any leading "## Overview" the caller included
   if (options?.content) {
-    content = insertContentUnderHeading(content, options.content, "## Overview");
+    content = insertContentUnderHeading(content, stripLeadingHeading(options.content, "## Overview"), "## Overview");
   }
 
   await fs.writeFile(fullPath, content, "utf-8");
@@ -313,7 +327,8 @@ export async function setProjectField(
 
   const fullPath = path.join(config.vaultPath, project.filePath);
   const content = await fs.readFile(fullPath, "utf-8");
-  const updated = injectFrontmatterField(content, key, value);
+  const normalizedValue = key === "tags" && Array.isArray(value) ? normalizeTags(value) : value;
+  const updated = injectFrontmatterField(content, key, normalizedValue);
   await fs.writeFile(fullPath, updated, "utf-8");
 }
 
