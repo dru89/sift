@@ -5,6 +5,7 @@ export {
   applyFilter,
   matchesSearch,
   sortByUrgency,
+  isNotYetStartable,
   getNextTasks,
   getOverdueTasks,
   getDueToday,

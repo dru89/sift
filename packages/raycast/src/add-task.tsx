@@ -13,6 +13,7 @@ export default function AddTask() {
     priority: string;
     due: Date | null;
     scheduled: Date | null;
+    start: Date | null;
   }) {
     if (!values.description.trim()) {
       showToast(Toast.Style.Failure, "Task description is required");
@@ -25,6 +26,7 @@ export default function AddTask() {
         priority: (values.priority || undefined) as Priority | undefined,
         due: values.due ? formatDate(values.due) : undefined,
         scheduled: values.scheduled ? formatDate(values.scheduled) : undefined,
+        start: values.start ? formatDate(values.start) : undefined,
       });
 
       showToast(Toast.Style.Success, "Task added!", taskLine);
@@ -58,6 +60,7 @@ export default function AddTask() {
       </Form.Dropdown>
       <Form.DatePicker id="due" title="Due Date" type={Form.DatePicker.Type.Date} />
       <Form.DatePicker id="scheduled" title="Scheduled Date" type={Form.DatePicker.Type.Date} />
+      <Form.DatePicker id="start" title="Start Date" type={Form.DatePicker.Type.Date} />
     </Form>
   );
 }

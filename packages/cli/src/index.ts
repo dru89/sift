@@ -723,7 +723,7 @@ program
 
     // Stale
     if (review.stale.length > 0) {
-      console.log(chalk.bold.yellow(`⚠️  Stale — no due date, no schedule (${review.stale.length})`));
+      console.log(chalk.bold.yellow(`⚠️  Stale — no due date, no schedule, no start date (${review.stale.length})`));
       for (const task of review.stale.slice(0, 10)) {
         const parts = ["  " + chalk.dim("○"), task.description];
         if (task.created) parts.push(chalk.dim(`created ${task.created}`));

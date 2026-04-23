@@ -158,7 +158,7 @@ sift summary
 Pure library, no CLI or UI. Key exports:
 
 - **Parser**: `parseLine()`, `parseContent()`, `formatTask()`
-- **Scanner**: `scanTasks()`, `scanFile()`, `getNextTasks()`, `getOverdueTasks()`, `getDueToday()`, `sortByUrgency()`, `getReviewSummary()`, `scanChangelog()`
+- **Scanner**: `scanTasks()`, `scanFile()`, `getNextTasks()`, `getOverdueTasks()`, `getDueToday()`, `sortByUrgency()`, `isNotYetStartable()`, `getReviewSummary()`, `scanChangelog()`
 - **Writer**: `addTask()`, `addTaskToFile()`, `addNote()`, `completeTask()`, `findTasks()`, `createSubnote()`, `markTaskStatus()`, `insertContentUnderHeading()`
 - **Projects**: `listProjects()`, `findProject()`, `createProject()`, `createArea()`, `setProjectField()`
 - **Config**: `resolveConfig()`, `writeConfig()`

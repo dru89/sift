@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import chalk from "chalk";
-import { localToday, type Task, type Priority } from "@sift/core";
+import { localToday, isNotYetStartable, type Task, type Priority } from "@sift/core";
 
 /**
  * Priority display configuration: label, color, and sort indicator.
@@ -48,6 +48,12 @@ export function formatTask(task: Task, options?: FormatTaskOptions): string {
   }
   if (task.scheduled) {
     dateParts.push(chalk.dim(`scheduled ${task.scheduled}`));
+  }
+  if (task.start) {
+    const label = isNotYetStartable(task)
+      ? chalk.yellow(`starts ${task.start}`)
+      : chalk.dim(`starts ${task.start}`);
+    dateParts.push(label);
   }
 
   if (dateParts.length > 0) {

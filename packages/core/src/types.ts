@@ -167,6 +167,12 @@ export interface TaskFilter {
   /** Only return tasks scheduled on or before this date (YYYY-MM-DD) */
   scheduledBefore?: string;
 
+  /** Only return tasks with a start date on or before this date (YYYY-MM-DD) */
+  startBefore?: string;
+
+  /** Only return tasks with a start date on or after this date (YYYY-MM-DD) */
+  startAfter?: string;
+
   /** Only return tasks from files matching this glob pattern */
   filePattern?: string;
 
@@ -232,7 +238,7 @@ export interface ReviewSummary {
   /** Tasks created during the period that are still open (have ➕ date in range) */
   created: Task[];
 
-  /** Open tasks with no due/scheduled date, created before the period */
+  /** Open tasks with no due/scheduled/start date, created before the period */
   stale: Task[];
 
   /** Changelog entries from project files during the period */

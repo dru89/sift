@@ -104,6 +104,18 @@ export function applyFilter(tasks: Task[], filter?: TaskFilter): Task[] {
     );
   }
 
+  if (filter.startBefore) {
+    result = result.filter(
+      (t) => t.start !== null && t.start <= filter.startBefore!,
+    );
+  }
+
+  if (filter.startAfter) {
+    result = result.filter(
+      (t) => t.start !== null && t.start >= filter.startAfter!,
+    );
+  }
+
   if (filter.search) {
     result = result.filter((t) => matchesSearch(t.description, filter.search!));
   }
@@ -141,15 +153,32 @@ export function matchesSearch(description: string, search: string): boolean {
 }
 
 /**
+ * Check whether a task's start date is in the future (not yet actionable).
+ * Tasks with no start date are always considered "ready."
+ */
+export function isNotYetStartable(task: Task, today?: string): boolean {
+  if (!task.start) return false;
+  return task.start > (today ?? localToday());
+}
+
+/**
  * Sort tasks by urgency/importance.
  * Sort order:
- * 1. Priority (highest first)
- * 2. Due date (soonest first, tasks with due dates before tasks without)
- * 3. Scheduled date (soonest first)
- * 4. Alphabetical by description
+ * 1. Startability (tasks ready to start before future-start tasks)
+ * 2. Priority (highest first)
+ * 3. Due date (soonest first, tasks with due dates before tasks without)
+ * 4. Scheduled date (soonest first)
+ * 5. Start date (soonest first, for future-start tasks)
+ * 6. Alphabetical by description
  */
 export function sortByUrgency(tasks: Task[]): Task[] {
+  const today = localToday();
   return [...tasks].sort((a, b) => {
+    // Future-start tasks sink below ready tasks
+    const futureA = isNotYetStartable(a, today) ? 1 : 0;
+    const futureB = isNotYetStartable(b, today) ? 1 : 0;
+    if (futureA !== futureB) return futureA - futureB;
+
     // Priority first
     const prioA = PRIORITY_ORDER[a.priority];
     const prioB = PRIORITY_ORDER[b.priority];
@@ -167,6 +196,13 @@ export function sortByUrgency(tasks: Task[]): Task[] {
       if (a.scheduled === null) return 1;
       if (b.scheduled === null) return -1;
       return a.scheduled.localeCompare(b.scheduled);
+    }
+
+    // Start date (for future-start tasks, soonest first)
+    if (a.start !== b.start) {
+      if (a.start === null) return 1;
+      if (b.start === null) return -1;
+      return a.start.localeCompare(b.start);
     }
 
     // Alphabetical fallback
@@ -398,13 +434,15 @@ export async function getReviewSummary(
     ),
   );
 
-  // Stale tasks: actionable, no due or scheduled date, created before the period
+  // Stale tasks: actionable, no due/scheduled/start date, created before the period.
+  // Tasks with a start date are intentionally deferred, not stale.
   const stale = sortByUrgency(
     allTasks.filter(
       (t) =>
         ACTIONABLE_STATUSES.includes(t.status) &&
         t.due === null &&
         t.scheduled === null &&
+        t.start === null &&
         (t.created === null || t.created < effectiveSince),
     ),
   );

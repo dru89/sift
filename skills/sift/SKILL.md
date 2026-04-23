@@ -168,11 +168,12 @@ All paths returned by sift tools (including `sift_find`, `sift_list`, `sift_next
 Tasks should **always be added to today's daily note** using `sift_add` (unless they belong to a project). When the user refers to a future date (e.g. "add a task for tomorrow", "add a task for Friday", "I need to do this next week"), do NOT try to add it to that day's note. Instead:
 
 1. **Always add to today's note** (this is what `sift_add` does by default).
-2. **Set the `scheduled` parameter** to the date the user mentioned. For example:
-   - "add a task for tomorrow" -> `scheduled: <tomorrow's date>`
-   - "add a task for Friday" -> `scheduled: <next Friday's date>`
-   - "add a task for next week" -> `scheduled: <next Monday's date>`
-3. **Use `due` instead of `scheduled`** if the task sounds high-priority or has a hard deadline (e.g. "I need to do X by Friday", "this is due next Tuesday"). Use your judgment -- `due` implies a deadline, `scheduled` implies "plan to work on this that day."
+2. **Choose the right date field** based on the user's intent:
+   - **`start`** — the earliest date the task *can* be worked on. Use when the user says things like "I can't start this until Monday", "this is blocked until next week", "not available until after the 15th", or "don't worry about this until Friday." Tasks with a future start date are deprioritized in `sift next` — they still appear, but below tasks that are ready now.
+   - **`scheduled`** — when you *plan* to work on it. Use for "add a task for tomorrow", "I'll do this Friday", "schedule this for next week." This is a self-imposed intention, not a hard constraint.
+   - **`due`** — when the task *must* be done by. Use for hard deadlines: "this is due Friday", "I need to finish this by next Tuesday", "deadline is March 10th."
+3. **Multiple dates are fine.** A task can have both a start date and a due date (e.g., "I can't start this until Monday but it's due Wednesday" → `start: Monday, due: Wednesday`). Or a start and a scheduled date.
+4. **When in doubt between start and scheduled:** If the constraint is external (blocked by someone else, waiting on a dependency, calendar-driven), use `start`. If it's the user's own plan for when to tackle it, use `scheduled`.
 
 ## Review
 
@@ -184,7 +185,7 @@ Use `sift_review` to generate a review summary for any time period. It defaults 
 - **Project notes** -- changelog entries from project files during the period
 - **New notes** -- non-task vault files (meetings, weblinks, etc.) dated within the period
 - **Deferred** -- tasks marked `on_hold` or `moved` that were created during the period
-- **Stale tasks** -- actionable tasks with no due or scheduled date (may need triage)
+- **Stale tasks** -- actionable tasks with no due, scheduled, or start date (may need triage)
 - **Upcoming** -- tasks due in the 7 days after the review period
 
 **Parameters:**

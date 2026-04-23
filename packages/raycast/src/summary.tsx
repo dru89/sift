@@ -1,6 +1,6 @@
 import { List, Icon, Color, ActionPanel, Action, showToast, Toast } from "@raycast/api";
 import { useState, useEffect } from "react";
-import { getNextTasks, getOverdueTasks, scanTasks, sortByUrgency, completeTask, localToday, type Task, type Priority } from "@sift/core";
+import { getNextTasks, getOverdueTasks, scanTasks, sortByUrgency, completeTask, localToday, isNotYetStartable, type Task, type Priority } from "@sift/core";
 import { getConfig } from "./config";
 
 const PRIORITY_ICONS: Record<Priority, { icon: Icon; color: Color }> = {
@@ -81,6 +81,7 @@ function TaskItem({ task, config }: { task: Task; config: ReturnType<typeof getC
       accessories={[
         ...(task.due ? [{ text: { value: `Due ${task.due}`, color: isOverdue ? Color.Red : undefined } }] : []),
         ...(task.scheduled ? [{ text: `Scheduled ${task.scheduled}` }] : []),
+        ...(task.start ? [{ text: { value: `Starts ${task.start}`, color: isNotYetStartable(task) ? Color.Orange : undefined } }] : []),
       ]}
       actions={
         <ActionPanel>
