@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m json.tool)",
+      "Bash(npm config *)",
+      "Bash(npm run *)",
+      "Bash(npm link *)",
+      "Bash(where sift *)",
+      "WebFetch(domain:opencode.ai)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}
