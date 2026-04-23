@@ -12,14 +12,15 @@ function scalar(val: unknown): string | undefined {
 
 /**
  * Extract the area name from a frontmatter `area` field.
- * Handles both plain text ("Sift") and wiki link format ("[[Sift]]").
+ * Handles: "[[Sift]]", [[Sift]], "Sift", Sift
  */
 function parseAreaRef(val: unknown): string | undefined {
   const s = scalar(val);
   if (!s) return undefined;
-  // Strip wiki link syntax: [[Name]] -> Name, "[[Name]]" -> Name
-  const match = s.match(/^\[?\[?([^\]]+)\]?\]?$/);
-  return match ? match[1].replace(/^["']|["']$/g, "") : s;
+  // Strip surrounding quotes, then wiki link brackets
+  let result = s.replace(/^["']|["']$/g, "");
+  result = result.replace(/^\[\[|\]\]$/g, "");
+  return result || undefined;
 }
 
 /**
