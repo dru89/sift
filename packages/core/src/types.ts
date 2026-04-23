@@ -92,8 +92,14 @@ export interface SiftConfig {
   /** Path to the projects folder, relative to vault root. Defaults to "Projects". */
   projectsPath: string;
 
+  /** Path to the areas folder, relative to vault root. Defaults to "Areas". */
+  areasPath: string;
+
   /** Path to the project template file, relative to vault root. Defaults to "Templates/Project.md". */
   projectTemplatePath: string;
+
+  /** Path to the area template file, relative to vault root. Defaults to "Templates/Area.md". */
+  areaTemplatePath: string;
 
   /**
    * The project associated with the current working directory.
@@ -110,16 +116,26 @@ export interface SiftConfig {
 export type ProjectStatus = "active" | "planning" | "someday" | "done";
 
 /**
- * Metadata about a project in the vault.
+ * The kind of trackable item: a finite project or a persistent area.
+ * - "project" — finite work with a deliverable, can be completed
+ * - "area" — ongoing responsibility, no finish line
+ */
+export type ItemKind = "project" | "area";
+
+/**
+ * Metadata about a project or area in the vault.
  */
 export interface ProjectInfo {
-  /** The project name (derived from filename) */
+  /** The project/area name (derived from filename) */
   name: string;
 
-  /** Path to the project file, relative to vault root */
+  /** Path to the file, relative to vault root */
   filePath: string;
 
-  /** Frontmatter status field, if present */
+  /** Whether this is a project or area (from `type` frontmatter) */
+  kind: ItemKind;
+
+  /** Frontmatter status field, if present. Areas typically don't use this. */
   status?: string;
 
   /** Frontmatter timeframe field, if present */
@@ -130,6 +146,9 @@ export interface ProjectInfo {
 
   /** Frontmatter created date (YYYY-MM-DD), if present */
   created?: string;
+
+  /** The parent area name, if this project references one */
+  area?: string;
 }
 
 /**

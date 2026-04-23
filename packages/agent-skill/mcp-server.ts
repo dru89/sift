@@ -243,6 +243,11 @@ const tools: Tool[] = [
           type: "string",
           description: "Filter to only show projects with this tag",
         },
+        kind: {
+          type: "string",
+          enum: ["project", "area"],
+          description: "Filter by kind: 'project' or 'area'. If omitted, returns both.",
+        },
       },
     },
   },
@@ -351,9 +356,39 @@ const tools: Tool[] = [
     },
   },
   {
+    name: "sift_area_create",
+    description:
+      "Create a new area from the vault's area template.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "The area name (becomes the filename)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "sift_area_path",
+    description:
+      "Get the absolute file path for an area. Useful when you need to read or edit an area file directly.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "The area name to look up",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  {
     name: "sift_project_set",
     description:
-      "Update frontmatter fields on a project (status, timeframe, tags). Use this to change a project's status (active, planning, someday, done), timeframe, or tags.",
+      "Update frontmatter fields on a project or area (status, timeframe, tags). Use this to change a project's or area's status (active, planning, someday, done), timeframe, or tags.",
     inputSchema: {
       type: "object",
       properties: {
@@ -627,6 +662,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "sift_projects": {
         const cliArgs = ["projects"];
         if (args?.tag) cliArgs.push("--tag", args.tag as string);
+        if (args?.kind) cliArgs.push("--kind", args.kind as string);
         const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],
@@ -642,6 +678,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "sift_project_path": {
         const result = runSift(["project", "path", "--absolute", "--", args?.name as string]);
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      }
+
+      case "sift_area_create": {
+        const result = runSift(["area", "create", "--absolute", "--", args?.name as string]);
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      }
+
+      case "sift_area_path": {
+        const result = runSift(["area", "path", "--absolute", "--", args?.name as string]);
         return {
           content: [{ type: "text", text: result }],
         };

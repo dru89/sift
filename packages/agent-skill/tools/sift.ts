@@ -256,10 +256,15 @@ export const projects = tool({
       .string()
       .optional()
       .describe("Filter to only show projects with this tag"),
+    kind: tool.schema
+      .enum(["project", "area"])
+      .optional()
+      .describe("Filter by kind: 'project' or 'area'. If omitted, returns both."),
   },
   async execute(args) {
     const cliArgs = ["projects"];
     if (args.tag) cliArgs.push("--tag", args.tag);
+    if (args.kind) cliArgs.push("--kind", args.kind);
     return runSift(cliArgs);
   },
 });
@@ -286,6 +291,31 @@ export const project_path = tool({
   },
   async execute(args) {
     return runSift(["project", "path", "--absolute", "--", args.name]);
+  },
+});
+
+export const area_create = tool({
+  description: "Create a new area from the vault's area template.",
+  args: {
+    name: tool.schema
+      .string()
+      .describe("The area name (becomes the filename)"),
+  },
+  async execute(args) {
+    return runSift(["area", "create", "--absolute", "--", args.name]);
+  },
+});
+
+export const area_path = tool({
+  description:
+    "Get the absolute file path for an area. Useful when you need to read or edit an area file directly.",
+  args: {
+    name: tool.schema
+      .string()
+      .describe("The area name to look up"),
+  },
+  async execute(args) {
+    return runSift(["area", "path", "--absolute", "--", args.name]);
   },
 });
 
@@ -379,7 +409,7 @@ export const subnote = tool({
 
 export const project_set = tool({
   description:
-    "Update frontmatter fields on a project (status, timeframe, tags). Use this to change a project's status (active, planning, someday, done), timeframe, or tags.",
+    "Update frontmatter fields on a project or area (status, timeframe, tags). Use this to change a project's or area's status (active, planning, someday, done), timeframe, or tags.",
   args: {
     name: tool.schema.string().describe("The project name"),
     status: tool.schema

@@ -21,6 +21,7 @@ import {
   listProjects,
   findProject,
   createProject,
+  createArea,
   setProjectField,
   localToday,
   addDays,
@@ -336,47 +337,75 @@ program
 // ─── sift projects ───────────────────────────────────────────
 program
   .command("projects")
-  .description("List projects in the vault")
-  .option("--tag <tag>", "Filter to projects with this tag")
+  .description("List projects and areas in the vault")
+  .option("--tag <tag>", "Filter by tag")
+  .option("--kind <kind>", "Filter by kind: project or area")
   .action(async (opts) => {
     const config = await resolveConfig();
-    let projects = await listProjects(config);
+    const kindFilter = opts.kind as "project" | "area" | undefined;
+    let items = await listProjects(config, kindFilter);
 
     if (opts.tag) {
       const tagLower = opts.tag.toLowerCase();
-      projects = projects.filter((p) =>
+      items = items.filter((p) =>
         p.tags?.some((t) => t.toLowerCase() === tagLower),
       );
     }
 
-    if (projects.length === 0) {
+    if (items.length === 0) {
       const msg = opts.tag
-        ? `No projects found with tag #${opts.tag}`
-        : `No projects found in ${config.projectsPath}`;
+        ? `No items found with tag #${opts.tag}`
+        : opts.kind
+          ? `No ${opts.kind}s found`
+          : `No projects or areas found`;
       console.log(chalk.dim(msg));
       return;
     }
 
-    console.log(chalk.bold("Projects"));
-    for (const project of projects) {
-      const effectiveStatus = project.status || "active";
-      const inactive = effectiveStatus === "someday" || effectiveStatus === "done";
-      const nameStr = inactive ? chalk.dim(project.name) : chalk.white(project.name);
-      const parts: string[] = [nameStr];
-      if (project.status) {
-        parts.push(chalk.dim(`(${project.status})`));
+    // Group by kind
+    const areas = items.filter((p) => p.kind === "area");
+    const projects = items.filter((p) => p.kind === "project");
+
+    if (areas.length > 0 && !kindFilter) {
+      console.log(chalk.bold("Areas"));
+      for (const area of areas) {
+        const parts: string[] = [chalk.white(area.name)];
+        if (area.tags && area.tags.length > 0) {
+          parts.push(chalk.cyan(area.tags.map((t) => `#${t}`).join(" ")));
+        }
+        if (area.created) {
+          parts.push(chalk.dim(area.created));
+        }
+        console.log("  " + parts.join("  "));
       }
-      if (project.timeframe) {
-        parts.push(chalk.dim(`[${project.timeframe}]`));
+      if (projects.length > 0) console.log();
+    }
+
+    if (projects.length > 0) {
+      if (!kindFilter) console.log(chalk.bold("Projects"));
+      for (const project of projects) {
+        const effectiveStatus = project.status || "active";
+        const inactive = effectiveStatus === "someday" || effectiveStatus === "done";
+        const nameStr = inactive ? chalk.dim(project.name) : chalk.white(project.name);
+        const parts: string[] = [nameStr];
+        if (project.status) {
+          parts.push(chalk.dim(`(${project.status})`));
+        }
+        if (project.area) {
+          parts.push(chalk.dim(`→ ${project.area}`));
+        }
+        if (project.timeframe) {
+          parts.push(chalk.dim(`[${project.timeframe}]`));
+        }
+        if (project.tags && project.tags.length > 0) {
+          const tagStr = project.tags.map((t) => `#${t}`).join(" ");
+          parts.push(inactive ? chalk.dim(tagStr) : chalk.cyan(tagStr));
+        }
+        if (project.created) {
+          parts.push(chalk.dim(project.created));
+        }
+        console.log("  " + parts.join("  "));
       }
-      if (project.tags && project.tags.length > 0) {
-        const tagStr = project.tags.map((t) => `#${t}`).join(" ");
-        parts.push(inactive ? chalk.dim(tagStr) : chalk.cyan(tagStr));
-      }
-      if (project.created) {
-        parts.push(chalk.dim(project.created));
-      }
-      console.log("  " + parts.join("  "));
     }
   });
 
@@ -454,6 +483,51 @@ projectCmd
     } catch (err: any) {
       console.error(chalk.red("Error: ") + err.message);
       process.exit(1);
+    }
+  });
+
+// ─── sift area ──────────────────────────────────────────────
+const areaCmd = program
+  .command("area")
+  .description("Manage areas");
+
+areaCmd
+  .command("create <name...>")
+  .description("Create a new area from template")
+  .option("--absolute", "Show absolute file path instead of vault-relative")
+  .action(async (nameParts: string[], opts) => {
+    const config = await resolveConfig();
+    const name = nameParts.join(" ");
+
+    try {
+      const filePath = await createArea(config, name);
+      const displayPath = opts.absolute ? path.join(config.vaultPath, filePath) : filePath;
+      console.log(chalk.green("✓") + ` Created area "${name}"`);
+      console.log(chalk.dim("  File: ") + displayPath);
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
+    }
+  });
+
+areaCmd
+  .command("path <name...>")
+  .description("Get the vault-relative file path for an area")
+  .option("--absolute", "Return the absolute path instead of vault-relative")
+  .action(async (nameParts: string[], opts) => {
+    const config = await resolveConfig();
+    const name = nameParts.join(" ");
+    const area = await findProject(config, name);
+
+    if (!area || area.kind !== "area") {
+      console.error(chalk.red(`Area "${name}" not found.`));
+      process.exit(1);
+    }
+
+    if (opts.absolute) {
+      console.log(path.join(config.vaultPath, area.filePath));
+    } else {
+      console.log(area.filePath);
     }
   });
 
@@ -661,7 +735,9 @@ program
   .argument("<vault-path>", "Path to your Obsidian vault")
   .option("--daily-notes <path>", "Daily notes folder (relative to vault)", "Daily Notes")
   .option("--projects <path>", "Projects folder (relative to vault)", "Projects")
+  .option("--areas <path>", "Areas folder (relative to vault)", "Areas")
   .option("--project-template <path>", "Project template file (relative to vault)", "Templates/Project.md")
+  .option("--area-template <path>", "Area template file (relative to vault)", "Templates/Area.md")
   .option("--exclude <folders...>", "Folders to exclude from scanning")
   .action(async (vaultPath: string, opts) => {
     const config: SiftConfig = {
@@ -670,7 +746,9 @@ program
       dailyNotesFormat: "YYYY-MM-DD",
       excludeFolders: opts.exclude || ["Templates", "Attachments"],
       projectsPath: opts.projects,
+      areasPath: opts.areas,
       projectTemplatePath: opts.projectTemplate,
+      areaTemplatePath: opts.areaTemplate,
     };
 
     const configPath = await writeConfig(config);

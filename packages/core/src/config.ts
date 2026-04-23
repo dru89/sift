@@ -12,7 +12,9 @@ const DEFAULTS: Omit<SiftConfig, "vaultPath"> = {
   dailyNotesFormat: "YYYY-MM-DD",
   excludeFolders: ["Templates", "Attachments"],
   projectsPath: "Projects",
+  areasPath: "Areas",
   projectTemplatePath: "Templates/Project.md",
+  areaTemplatePath: "Templates/Area.md",
 };
 
 /**

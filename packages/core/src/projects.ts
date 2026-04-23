@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { glob } from "glob";
-import { type SiftConfig, type ProjectInfo } from "./types.js";
+import { type SiftConfig, type ProjectInfo, type ItemKind } from "./types.js";
 import { localToday } from "./dates.js";
 
 /** Return a string value from a frontmatter field, or undefined if blank/array. */
@@ -11,52 +11,86 @@ function scalar(val: unknown): string | undefined {
 }
 
 /**
- * List all projects in the vault by scanning the projects folder
- * for markdown files with `type: project` frontmatter.
+ * Extract the area name from a frontmatter `area` field.
+ * Handles both plain text ("Sift") and wiki link format ("[[Sift]]").
+ */
+function parseAreaRef(val: unknown): string | undefined {
+  const s = scalar(val);
+  if (!s) return undefined;
+  // Strip wiki link syntax: [[Name]] -> Name, "[[Name]]" -> Name
+  const match = s.match(/^\[?\[?([^\]]+)\]?\]?$/);
+  return match ? match[1].replace(/^["']|["']$/g, "") : s;
+}
+
+/**
+ * List all projects and areas in the vault by scanning the projects and
+ * areas folders for markdown files with `type: project` or `type: area`
+ * frontmatter.
  *
  * @param config - The sift configuration
- * @returns Array of project info objects, sorted alphabetically by name
+ * @param filter - Optional filter: "project", "area", or undefined for both
+ * @returns Array of project/area info objects, sorted alphabetically by name
  */
-export async function listProjects(config: SiftConfig): Promise<ProjectInfo[]> {
-  const projectsDir = path.join(config.vaultPath, config.projectsPath);
+export async function listProjects(
+  config: SiftConfig,
+  filter?: ItemKind,
+): Promise<ProjectInfo[]> {
+  const results: ProjectInfo[] = [];
 
-  // Check if the projects directory exists
-  try {
-    await fs.access(projectsDir);
-  } catch {
-    return [];
-  }
+  // Scan both folders
+  const folders: Array<{ dir: string; relPath: string; expectedType: ItemKind }> = [
+    { dir: path.join(config.vaultPath, config.projectsPath), relPath: config.projectsPath, expectedType: "project" },
+    { dir: path.join(config.vaultPath, config.areasPath), relPath: config.areasPath, expectedType: "area" },
+  ];
 
-  const files = await glob("*.md", {
-    cwd: projectsDir,
-    absolute: false,
-  });
+  for (const { dir, relPath, expectedType } of folders) {
+    // Skip if folder doesn't exist
+    try {
+      await fs.access(dir);
+    } catch {
+      continue;
+    }
 
-  const projects: ProjectInfo[] = [];
+    // Skip if filtering for the other type
+    if (filter && filter !== expectedType) continue;
 
-  for (const file of files) {
-    const fullPath = path.join(projectsDir, file);
-    const content = await fs.readFile(fullPath, "utf-8");
-    const frontmatter = parseFrontmatter(content);
-
-    // Only include files that have type: project in frontmatter
-    if (frontmatter?.type !== "project") continue;
-
-    const name = path.basename(file, ".md");
-    const filePath = path.join(config.projectsPath, file);
-
-    // Use scalar() to guard against parseFrontmatter returning empty arrays for blank fields
-    projects.push({
-      name,
-      filePath,
-      status: scalar(frontmatter.status),
-      timeframe: scalar(frontmatter.timeframe),
-      tags: Array.isArray(frontmatter.tags) && frontmatter.tags.length > 0 ? frontmatter.tags : undefined,
-      created: scalar(frontmatter.created),
+    const files = await glob("*.md", {
+      cwd: dir,
+      absolute: false,
     });
+
+    for (const file of files) {
+      const fullPath = path.join(dir, file);
+      const content = await fs.readFile(fullPath, "utf-8");
+      const frontmatter = parseFrontmatter(content);
+      if (!frontmatter) continue;
+
+      // Only include files with the expected type in frontmatter
+      const fmType = frontmatter.type;
+      if (fmType !== "project" && fmType !== "area") continue;
+
+      const kind: ItemKind = fmType;
+
+      // Apply filter if specified
+      if (filter && kind !== filter) continue;
+
+      const name = path.basename(file, ".md");
+      const filePath = path.join(relPath, file);
+
+      results.push({
+        name,
+        filePath,
+        kind,
+        status: scalar(frontmatter.status),
+        timeframe: scalar(frontmatter.timeframe),
+        tags: Array.isArray(frontmatter.tags) && frontmatter.tags.length > 0 ? frontmatter.tags : undefined,
+        created: scalar(frontmatter.created),
+        area: parseAreaRef(frontmatter.area),
+      });
+    }
   }
 
-  return projects.sort((a, b) => a.name.localeCompare(b.name));
+  return results.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -110,6 +144,52 @@ export async function createProject(
   } catch {
     // Template doesn't exist, use a sensible default
     content = getDefaultProjectTemplate();
+  }
+
+  // Inject today's date as the created field
+  content = injectFrontmatterField(content, "created", localToday());
+
+  await fs.writeFile(fullPath, content, "utf-8");
+  return filePath;
+}
+
+/**
+ * Create a new area file from the configured template.
+ *
+ * @param config - The sift configuration
+ * @param name - The area name (becomes the filename)
+ * @returns The file path (relative to vault root) of the created area
+ * @throws If the area already exists
+ */
+export async function createArea(
+  config: SiftConfig,
+  name: string,
+): Promise<string> {
+  const filePath = path.join(config.areasPath, `${name}.md`);
+  const fullPath = path.join(config.vaultPath, filePath);
+
+  // Check if area already exists
+  try {
+    await fs.access(fullPath);
+    throw new Error(`Area "${name}" already exists at ${filePath}`);
+  } catch (err: any) {
+    if (err.code !== "ENOENT") throw err;
+  }
+
+  // Ensure the areas directory exists
+  await fs.mkdir(path.dirname(fullPath), { recursive: true });
+
+  // Try to read the template
+  let content: string;
+  const templatePath = path.join(config.vaultPath, config.areaTemplatePath);
+  try {
+    const template = await fs.readFile(templatePath, "utf-8");
+    // Replace tp.file.title with the actual name before stripping other Templater syntax,
+    // so Dataview queries that reference the file name (e.g., Current Projects) work correctly.
+    content = template.replace(/<% tp\.file\.title %>/g, name);
+    content = stripTemplaterSyntax(content);
+  } catch {
+    content = getDefaultAreaTemplate(name);
   }
 
   // Inject today's date as the created field
@@ -195,6 +275,7 @@ function getDefaultProjectTemplate(): string {
   return `---
 type: project
 status:
+area:
 created:
 timeframe:
 teams:
@@ -208,6 +289,54 @@ tags:
 
 
 ## Notes
+`;
+}
+
+/**
+ * Default area template used when no template file is configured or found.
+ */
+function getDefaultAreaTemplate(name: string): string {
+  return `---
+type: area
+created:
+teams:
+collaborators:
+tags:
+---
+## Overview
+
+
+## Goals
+
+
+## Tasks
+
+
+## Notes
+
+
+## Current Projects
+\`\`\`dataview
+TABLE WITHOUT ID
+  file.link as "Project",
+  status as "Status",
+  timeframe as "Timeframe"
+WHERE type = "project"
+  AND area = [[${name}]]
+SORT status ASC, file.name ASC
+\`\`\`
+
+## Related Files
+\`\`\`dataview
+TABLE WITHOUT ID
+  file.link as "File",
+  type as "Type",
+  file.folder as "Folder"
+WHERE contains(file.outlinks, this.file.link)
+  AND file.path != this.file.path
+  AND type != "daily-note"
+SORT type ASC, file.name ASC
+\`\`\`
 `;
 }
 
