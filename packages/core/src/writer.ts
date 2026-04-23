@@ -261,7 +261,6 @@ export async function createSubnote(
   // Build file content
   const parts = [frontmatterLines.join("\n")];
   if (options.content) {
-    parts.push("");
     parts.push(options.content);
   }
   const fileContent = parts.join("\n") + "\n";
