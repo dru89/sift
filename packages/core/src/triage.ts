@@ -22,6 +22,13 @@ const STALE_SCHEDULED_WEEKS = 4;
 /** A project is "inactive" if it has no activity for this many weeks. */
 const INACTIVE_WEEKS = 4;
 
+/**
+ * Suppress the undated_tasks signal on projects that had activity within
+ * this many days. Active projects with a few undated backlog tasks are
+ * being worked on; they'll get cleaned up naturally.
+ */
+const UNDATED_ACTIVITY_GRACE_DAYS = 14;
+
 /** A project's review is "overdue" (tier 1 escalation) at 2x its interval. */
 const OVERDUE_MULTIPLIER = 2;
 
@@ -183,12 +190,18 @@ export async function getTriageSummary(
       signals.push({ kind: "stale_tasks", count: staleTasks.length });
     }
 
-    // Signal: undated tasks with no recent activity
-    const undatedTasks = actionableTasks.filter(t =>
-      t.due === null && t.scheduled === null && t.start === null,
-    );
-    if (undatedTasks.length > 0) {
-      signals.push({ kind: "undated_tasks", count: undatedTasks.length });
+    // Signal: undated tasks — projects only, and only when there's been
+    // no recent activity. Areas naturally accumulate undated backlog tasks
+    // ("someday/maybe" items) and shouldn't be flagged for them.
+    if (project.kind === "project") {
+      const undatedTasks = actionableTasks.filter(t =>
+        t.due === null && t.scheduled === null && t.start === null,
+      );
+      const hasRecentActivity = lastActivity !== null &&
+        daysBetween(lastActivity, today) < UNDATED_ACTIVITY_GRACE_DAYS;
+      if (undatedTasks.length > 0 && !hasRecentActivity) {
+        signals.push({ kind: "undated_tasks", count: undatedTasks.length });
+      }
     }
 
     // Signal: marked active but no activity in INACTIVE_WEEKS
