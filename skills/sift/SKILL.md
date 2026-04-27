@@ -13,19 +13,22 @@ The following custom tools are available for interacting with the user's tasks a
 
 **Task management:**
 - **`sift_list`** - List open tasks, optionally filtered by search text, priority, due/scheduled/start date, or project/area. When `project` is an area name, automatically includes tasks from all projects linked to that area. Use `groupByProject: true` to bucket results by project.
-- **`sift_agenda`** - Show tasks relevant to today: due today, overdue, scheduled for today or past, in-progress, and newly available. Use when the user asks "what's on my plate today?"
+- **`sift_agenda`** - Show tasks relevant to today: due today, overdue, scheduled for today or past, in-progress, and undated tasks from daily notes in the last 7 days. Use when the user asks "what's on my plate today?"
 - **`sift_next`** - Get the most important tasks overall, sorted by urgency score (blends due date proximity, priority, scheduled date, and in-progress status)
 - **`sift_summary`** - Quick overview: today's agenda, counts, and what's up next
-- **`sift_add`** - Add a new task to today's daily note, or to a specific project/area
-- **`sift_find`** - Search for tasks without modifying them (use before `sift_done` or `sift_mark`; pass `all: true` to include completed/cancelled)
+- **`sift_add`** - Add a new task to today's daily note, or to a specific project/area. Auto-reopens "done" projects when a task is added to them.
+- **`sift_find`** - Search for tasks without modifying them (use before `sift_done`, `sift_mark`, `sift_update`, or `sift_move`; pass `all: true` to include completed/cancelled)
 - **`sift_done`** - Mark a task as complete (requires file+line from `sift_find`; confirm with user first; pass `description` for safety)
 - **`sift_mark`** - Mark a task with any status: `in_progress`, `on_hold`, `moved`, `cancelled`, `open`, or `done` (use `sift_find` first; pass `description` for safety)
+- **`sift_update`** - Modify a task's metadata in place: priority, due date, scheduled date, start date. Operates by file+line like `sift_done`. Pass "none" for a field to remove it. Use `sift_find` first; confirm with user before calling.
+- **`sift_move`** - Move a task from one file to another. Removes it from the source and inserts it under the appropriate heading in the destination (## Tasks for projects/areas, ## Journal for daily notes). **Destructive operation** — always confirm with the user before calling. Auto-reopens "done" destination projects.
 
 **Projects and areas:**
 - **`sift_projects`** - List all projects and areas (with status, tags, kind). Filter by `tag` or `kind` (project/area)
 - **`sift_project_create`** - Create a new project from template. Accepts `status`, `area`, `tags`, `content`, `frontmatter`
 - **`sift_project_path`** - Get the absolute file path for a project (for reading/editing)
 - **`sift_project_set`** - Update project/area frontmatter: `status`, `timeframe`, and/or `tags`
+- **`sift_project_review`** - Stamp `lastReviewed: today` on a project or area's frontmatter. Call this after reviewing a project during a triage session.
 - **`sift_area_create`** - Create a new area from template. Accepts `tags`, `content`, `frontmatter`
 - **`sift_area_path`** - Get the absolute file path for an area
 
@@ -33,6 +36,7 @@ The following custom tools are available for interacting with the user's tasks a
 - **`sift_note`** - Add a freeform note to a daily note, project, or area
 - **`sift_subnote`** - Create a separate note file linked to a project or area. Use for long-form content
 - **`sift_review`** - Generate a review summary (completed, created, needs triage, changelog, upcoming)
+- **`sift_triage`** - Return a tiered project review summary. Tier 1: projects needing attention. Tier 2: due for review but healthy. Tier 3: not due. Plus loose daily-note orphans. Use for project review sessions.
 
 **Graph and context (requires Obsidian to be running):**
 - **`sift_graph`** - Return the structural context for an area or project: child projects, subnotes, and other linked files (emails, weblinks). Excludes daily/weekly notes. Use to orient before working on an area.
@@ -88,6 +92,8 @@ Tasks use the Obsidian Tasks emoji format:
 - User asks about their priorities or task status
 - User wants to mark something as done, in progress, or deferred
 - User mentions a project or wants to create one
+- User asks to review their projects, clean up tasks, or run a triage
+- User wants to reschedule, reprioritize, or move a task
 
 ## Guidelines
 
@@ -250,6 +256,62 @@ Project files may have a `## Changelog` section with dated summary entries. Thes
 The review system (`sift_review`) aggregates existing changelog entries across projects for the review period.
 
 **Self-referential wiki links** (e.g., `[[Project Name]]` in content written to that project's own file) are automatically stripped — you don't need to avoid them manually.
+
+## Project triage
+
+`sift_triage` analyzes every project and area in the vault and returns a structured summary organized into three tiers plus a loose-tasks section. Use it for periodic project reviews or when the user asks to clean up their task backlog.
+
+### Tiers
+
+**Tier 1 — Needs attention.** Projects with concrete problems: review is seriously overdue, high-priority tasks have stale scheduled dates, undated tasks are piling up, no activity in 4+ weeks despite active status, daily-note orphans mention this project by wiki link, or the project is marked done but still has open tasks. Each tier 1 project lists the specific signals and all open tasks sorted by urgency.
+
+**Tier 2 — Quick check.** Projects due for review (past their review interval) but without tier 1 signals. Shows project name, open task count, last activity date, and the top two tasks by urgency. Most of these are fine and just need a `sift_project_review` stamp.
+
+**Tier 3 — Not due.** Recently reviewed or inactive projects. Names only, grouped by status. Scan these for anything the user forgot about.
+
+**Loose tasks.** Actionable undated tasks sitting on daily notes from the last 30 days. These have no due, scheduled, or start date, and don't live on any project or area file. They're the tasks most likely to be forgotten. If a loose task's description contains a `[[wiki link]]` to a project, the triage output notes that, and the project also gets a tier 1 "orphan mentions" signal.
+
+### Review intervals
+
+Each project/area has a review cadence based on its status:
+- Active projects: every 7 days
+- Planning projects: every 14 days
+- Areas: every 14 days
+- Someday projects: every 30 days
+- Done projects: never (unless they have open tasks)
+
+Projects can override the default with a `reviewInterval` field in frontmatter (value in days). A project is "due" when `today - lastReviewed >= interval`, and escalates to tier 1 at 2x the interval.
+
+### Running a triage session
+
+1. Call `sift_triage` to get the full summary.
+2. Present tier 1 first: "These N projects need attention" with the reason for each. Ask which one to start with.
+3. For each tier 1 project, show its tasks and the specific signals. Help the user decide what to do: reschedule tasks (`sift_update`), move tasks to the right project (`sift_move`), cancel stale work (`sift_mark`), change project status (`sift_project_set`), or add missing dates.
+4. After resolving a project, stamp it with `sift_project_review`.
+5. Present tier 2: "These N projects are due for review but look healthy." Show the one-line summaries. The user will wave through most of them. For any they want to dig into, show the full task list. Stamp reviewed projects with `sift_project_review`. Offer to bulk-stamp the rest.
+6. Show tier 3 names briefly: "These are recently reviewed or on hold. Anything catch your eye?"
+7. Show loose tasks: "You have N orphaned tasks from the last month." For each, suggest whether to move it to a project, schedule it, or cancel it.
+
+Follow the user's lead on pacing. Some reviews take 5 minutes (stamp everything, move two orphans). Others take 30 (major reprioritization, status changes, new projects). Don't run a wizard — present information, make suggestions, and let the user direct the session.
+
+### When to suggest a triage
+
+- During standup prep, if the user hasn't run triage in over a week
+- When the user asks "what should I work on?" and the answer depends on stale project context
+- When the user explicitly asks for a project review or cleanup
+- After a period of heavy task creation (the user just dumped a bunch of tasks and needs to organize them)
+
+Don't suggest triage unprompted every session. Once a week during standup prep is the natural cadence.
+
+### Confirmation patterns
+
+**For `sift_update` and `sift_mark`:** Call `sift_find` first, show the exact task, confirm the change, then execute. One round-trip.
+
+**For `sift_move`:** This is the most destructive operation. Always show: (1) the exact task being moved, (2) the source file, (3) the destination. Get explicit confirmation before calling.
+
+**For `sift_project_review`:** No confirmation needed. It's a read-only status stamp. Call it directly after the user reviews a project.
+
+**For bulk operations:** When the user wants to stamp multiple tier 2 projects as reviewed, list them all and confirm once ("Mark all 8 as reviewed?"), then call `sift_project_review` for each.
 
 ## Area-scoped task queries
 
