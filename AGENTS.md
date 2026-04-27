@@ -266,6 +266,14 @@ npm install
 npm run build        # builds all packages
 ```
 
+After building, install the skill and tools so your changes are picked up by agents:
+
+```bash
+make install         # builds, links CLI, installs skill, copies OpenCode tools
+```
+
+Always run `make install` (not just `npm run build`) when you've finished a set of changes. The agent skill, MCP server, and OpenCode native tools are all separate copies that need to be updated from the build output. `make install` handles all of it. Without this step, new or changed tools won't be available in agent sessions.
+
 The CLI is the primary entry point. After building:
 ```bash
 node packages/cli/dist/index.js summary
