@@ -333,6 +333,7 @@ export async function getNextTasks(
  * - Scheduled for today or a missed scheduled date (scheduled <= today)
  * - Start date is today (just became available)
  * - Status is in_progress (actively being worked on)
+ * - Undated task on a daily note from the last 7 days (recent but unfiled)
  *
  * Excludes tasks with a future start date (can't work on them yet).
  * Results are sorted by urgency score.
@@ -341,6 +342,8 @@ export async function getAgendaTasks(
   config: SiftConfig,
 ): Promise<Task[]> {
   const today = localToday();
+  const recentCutoff = addDays(today, -7);
+  const dailyNotesPrefix = config.dailyNotesPath + "/";
   const tasks = await scanTasks(config, { status: ACTIONABLE_STATUSES });
 
   const agenda = tasks.filter((t) => {
@@ -352,6 +355,19 @@ export async function getAgendaTasks(
     if (t.scheduled !== null && t.scheduled <= today) return true; // scheduled today or past
     if (t.start !== null && t.start === today) return true;      // just became available
     if (t.status === "in_progress") return true;                 // actively working on it
+
+    // Include undated tasks from recent daily notes (last 7 days).
+    // These are tasks you added recently but haven't scheduled or moved
+    // to a project — they stay on the agenda for a week before falling
+    // off into the triage loose-tasks bucket.
+    if (t.due === null && t.scheduled === null && t.start === null) {
+      if (t.filePath.startsWith(dailyNotesPrefix)) {
+        const basename = t.filePath.split("/").pop()?.replace(/\.md$/, "");
+        if (basename && /^\d{4}-\d{2}-\d{2}$/.test(basename) && basename >= recentCutoff) {
+          return true;
+        }
+      }
+    }
 
     return false;
   });
