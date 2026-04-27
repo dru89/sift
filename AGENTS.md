@@ -38,14 +38,21 @@ The agent integration files live in `skills/sift/`:
 
 ### Installation
 
+The quickest way to install everything:
+
+```bash
+npm install
+make install    # builds, links CLI, installs skill, copies OpenCode tools
+```
+
+This runs all the steps below. For selective installs or to understand what each step does, read on.
+
 **Step 1: Install the CLI**
 
 Build and link the CLI so it's available on PATH:
 
 ```bash
-npm install
-npm run build
-npm link         # makes `sift` available globally
+make install-cli    # or: npm run build && cd packages/cli && npm link
 ```
 
 **Step 2: Initialize config**
@@ -57,8 +64,7 @@ sift init /path/to/your/obsidian/vault
 **Step 3: Install the agent skill**
 
 ```bash
-npx skills add dru89/sift -g       # from GitHub
-npx skills add . -g -y             # from a local clone (during development)
+make install-skill  # or: npx skills add . -g -y
 ```
 
 This installs the SKILL.md, MCP server, and tool files to `~/.agents/skills/sift/`. Agents that read SKILL.md from that location (Codex, Copilot, etc.) get the instructions automatically.
@@ -111,6 +117,12 @@ OpenCode supports native TypeScript tools, which are faster than the MCP server 
 
 Note: symlinks don't work here — Node resolves imports relative to the real file path, and `@opencode-ai/plugin` is only installed in OpenCode's `node_modules`, not in the skill install directory.
 
+```bash
+make install-opencode   # copies from ~/.agents/skills/sift/tools/ to ~/.config/opencode/tools/
+```
+
+Or manually:
+
 **macOS / Linux:**
 ```bash
 cp ~/.agents/skills/sift/tools/sift.ts ~/.config/opencode/tools/sift.ts
@@ -123,9 +135,9 @@ Copy-Item "$env:USERPROFILE\.agents\skills\sift\tools\sift.ts" "$env:USERPROFILE
 Copy-Item "$env:USERPROFILE\.agents\skills\sift\tools\vault.ts" "$env:USERPROFILE\.config\opencode\tools\vault.ts"
 ```
 
-Re-run these commands after `npx skills add` to pick up changes.
+Re-run after `npx skills add` (or just use `make install`).
 
-**During development:** After changing skill files, re-run `npx skills add . -g -y` from the repo root, then copy the tool files again. The installer copies files to `~/.agents/skills/sift/`, but OpenCode reads from its own tools directory.
+**During development:** `make install` handles the full cycle — build, skill install, and OpenCode tool copy. Run it after changing any skill files.
 
 Both the MCP server and OpenCode tools resolve the `sift` CLI dynamically (from PATH or `SIFT_CLI_PATH` env var) rather than hardcoding a path.
 
