@@ -38,13 +38,21 @@ unlink: ## Unlink the sift CLI
 	cd packages/cli && npm unlink -g
 
 install-skill: build ## Install the agent skill (SKILL.md + MCP server)
-	npx skills add . -g -y
+	@if command -v npx >/dev/null 2>&1; then \
+		npx skills add . -g -y; \
+	else \
+		echo "  Skipping skill install (npx not found)"; \
+	fi
 
-install-opencode: install-skill ## Copy OpenCode native tools from the skill install
-	@mkdir -p "$(OPENCODE_TOOLS_DIR)"
-	cp "$(SKILL_INSTALL_DIR)/tools/sift.ts" "$(OPENCODE_TOOLS_DIR)/sift.ts"
-	cp "$(SKILL_INSTALL_DIR)/tools/vault.ts" "$(OPENCODE_TOOLS_DIR)/vault.ts"
-	@echo "  Copied tools to $(OPENCODE_TOOLS_DIR)"
+install-opencode: install-skill ## Copy OpenCode native tools (skipped if OpenCode not installed)
+	@if [ -d "$(HOME)/.config/opencode" ]; then \
+		mkdir -p "$(OPENCODE_TOOLS_DIR)"; \
+		cp "$(SKILL_INSTALL_DIR)/tools/sift.ts" "$(OPENCODE_TOOLS_DIR)/sift.ts"; \
+		cp "$(SKILL_INSTALL_DIR)/tools/vault.ts" "$(OPENCODE_TOOLS_DIR)/vault.ts"; \
+		echo "  Copied tools to $(OPENCODE_TOOLS_DIR)"; \
+	else \
+		echo "  Skipping OpenCode tools ($(HOME)/.config/opencode not found)"; \
+	fi
 
 # ─── Development ──────────────────────────────────────────────
 
