@@ -173,8 +173,8 @@ export interface TaskFilter {
   /** Only return tasks with a start date on or after this date (YYYY-MM-DD) */
   startAfter?: string;
 
-  /** Only return tasks from files matching this glob pattern */
-  filePattern?: string;
+  /** Only return tasks from files matching any of these path patterns */
+  filePatterns?: string[];
 
   /** Free-text search in description */
   search?: string;

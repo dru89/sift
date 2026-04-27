@@ -9,7 +9,13 @@
       "WebFetch(domain:opencode.ai)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Read(//Users/drew/.claude/**)",
+      "Read(//Users/drew/.config/claude/**)",
+      "Bash(python3 -m json.tool)",
+      "Bash(claude mcp *)",
+      "Read(//Users/drew/**)",
+      "Bash(grep *)"
     ]
   }
 }

@@ -23,15 +23,14 @@ All interfaces depend on `@sift/core`. The core package has zero UI concerns -- 
 
 ### Agent integration
 
-The agent integration files are in `packages/agent-skill/`:
+The agent integration files live in `skills/sift/`:
 
 **MCP Server (for Claude Code & Claude Desktop):**
-- `packages/agent-skill/mcp-server.ts` -- MCP server providing sift tools
-- Tools: `sift_list`, `sift_next`, `sift_summary`, `sift_add`, `sift_find`, `sift_done`, `sift_mark`, `sift_projects`, `sift_project_create`, `sift_project_path`, `sift_project_set`, `sift_note`, `sift_subnote`, `sift_area_create`, `sift_area_path`, `sift_review`, `vault_search`, `vault_backlinks`, `vault_read`, `vault_outline`
+- `skills/sift/mcp-server.ts` -- MCP server providing sift tools
+- Tools: `sift_list`, `sift_next`, `sift_summary`, `sift_add`, `sift_find`, `sift_done`, `sift_mark`, `sift_projects`, `sift_project_create`, `sift_project_path`, `sift_project_set`, `sift_note`, `sift_subnote`, `sift_area_create`, `sift_area_path`, `sift_review`, `sift_graph`, `vault_search`, `vault_backlinks`, `vault_read`, `vault_outline`
 
 **Agent Skill (all agents):**
-- `packages/agent-skill/SKILL.md` -- Skill definition
-- `packages/agent-skill/tools/sift.ts` -- OpenCode custom tools
+- `skills/sift/SKILL.md` -- Skill definition (also used by OpenCode via `tools/sift.ts`)
 - Install via `npx skills add dru89/sift -g` (from GitHub)
 - **During development:** `npx skills add . -g -y` (from the repo root). This copies files, so re-run after changing skill files.
 
@@ -85,6 +84,8 @@ A per-repo `.siftrc.json` can also include a `project` field to associate the wo
 ### Task scanning
 
 The scanner (`packages/core/src/scanner.ts`) walks all `.md` files in the vault, skipping excluded folders and root-level ALL_CAPS files (setup/reference docs). It parses every line looking for `- [ ]` or `- [x]` patterns and extracts metadata.
+
+`TaskFilter` accepts a `filePatterns?: string[]` field for restricting which files are scanned. When `sift list --project <name>` resolves to an area, it automatically expands to include all projects that declare that area in their `area:` frontmatter — so querying an area returns tasks from the area file and all its linked projects.
 
 ### Task writing
 
@@ -162,7 +163,7 @@ Pure library, no CLI or UI. Key exports:
 - **Writer**: `addTask()`, `addTaskToFile()`, `addNote()`, `completeTask()`, `findTasks()`, `createSubnote()`, `markTaskStatus()`, `insertContentUnderHeading()`
 - **Projects**: `listProjects()`, `findProject()`, `createProject()`, `createArea()`, `setProjectField()`
 - **Config**: `resolveConfig()`, `writeConfig()`
-- **Types**: `Task`, `TaskStatus`, `Priority`, `SiftConfig`, `TaskFilter`, `NewTaskOptions`, `AddNoteOptions`, `ProjectInfo`, `ItemKind`, `CreateItemOptions`, `CreateSubnoteOptions`, `SubnoteResult`, `ChangelogEntry`, `ReviewSummary`
+- **Types**: `Task`, `TaskStatus`, `Priority`, `SiftConfig`, `TaskFilter` (includes `filePatterns?: string[]`), `NewTaskOptions`, `AddNoteOptions`, `ProjectInfo`, `ItemKind`, `CreateItemOptions`, `CreateSubnoteOptions`, `SubnoteResult`, `ChangelogEntry`, `ReviewSummary`
 
 ### @sift/cli (`packages/cli/`)
 

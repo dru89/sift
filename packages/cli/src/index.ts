@@ -29,8 +29,9 @@ import {
   type Priority,
   type TaskStatus,
   type SiftConfig,
+  type Task,
 } from "@sift/core";
-import { formatTask, formatTaskList, formatSummary, type FormatTaskOptions } from "./format.js";
+import { formatTask, formatTaskList, formatGroupedTaskList, formatSummary, type FormatTaskOptions, type TaskGroup } from "./format.js";
 
 const program = new Command();
 
@@ -53,20 +54,31 @@ program
   .option("--start-before <date>", "Tasks with start date on or before date (YYYY-MM-DD)")
   .option("--start-after <date>", "Tasks with start date on or after date (YYYY-MM-DD)")
   .option("--project <name>", "Only show tasks from this project's file")
+  .option("--group-by-project", "Group tasks by project (applies when --project resolves to an area)")
   .option("--show-file", "Show file path for each task")
   .option("--absolute", "Show absolute file paths instead of vault-relative")
   .action(async (opts) => {
     const config = await resolveConfig();
 
-    // Resolve --project to a filePattern
-    let filePattern: string | undefined = opts.file;
+    // Resolve --project to one or more file patterns.
+    // When --project names an area, expand to include all projects linked to it.
+    let filePatterns: string[] | undefined = opts.file ? [opts.file] : undefined;
+    let expansionItems: Array<{ name: string; filePath: string }> | undefined;
+
     if (opts.project) {
       const project = await findProject(config, opts.project);
       if (!project) {
         console.error(chalk.red(`Project "${opts.project}" not found.`));
         process.exit(1);
       }
-      filePattern = project.filePath;
+      if (project.kind === "area") {
+        const all = await listProjects(config);
+        const linked = all.filter(p => p.kind === "project" && p.area === project.name);
+        expansionItems = [project, ...linked];
+        filePatterns = expansionItems.map(p => p.filePath);
+      } else {
+        filePatterns = [project.filePath];
+      }
     }
 
     const tasks = await scanTasks(config, {
@@ -77,15 +89,28 @@ program
       scheduledBefore: opts.scheduledBefore,
       startBefore: opts.startBefore,
       startAfter: opts.startAfter,
-      filePattern,
+      filePatterns,
     });
 
     const fmtOpts: FormatTaskOptions = {
       showFile: opts.showFile,
       vaultPath: opts.absolute ? config.vaultPath : undefined,
     };
-    const sorted = sortByUrgency(tasks);
-    console.log(formatTaskList(sorted, "Tasks", fmtOpts));
+
+    if (opts.groupByProject && expansionItems && expansionItems.length > 1) {
+      const tasksByFile = new Map<string, Task[]>(expansionItems.map(item => [item.filePath, []]));
+      for (const task of tasks) {
+        tasksByFile.get(task.filePath)?.push(task);
+      }
+      const groups: TaskGroup[] = expansionItems.map(item => ({
+        label: item.name,
+        tasks: sortByUrgency(tasksByFile.get(item.filePath) ?? []),
+      }));
+      console.log(formatGroupedTaskList(groups, fmtOpts));
+    } else {
+      console.log(formatTaskList(sortByUrgency(tasks), "Tasks", fmtOpts));
+    }
+
     console.log();
     console.log(formatSummary(await scanTasks(config)));
   });
@@ -158,16 +183,22 @@ program
     const config = await resolveConfig();
     const description = descriptionParts.join(" ");
 
-    const taskLine = await addTask(config, {
-      description,
-      priority: opts.priority as Priority | undefined,
-      due: opts.due,
-      scheduled: opts.scheduled,
-      start: opts.start,
-      recurrence: opts.recurrence,
-      project: opts.project,
-      date: opts.date,
-    });
+    let taskLine: string;
+    try {
+      taskLine = await addTask(config, {
+        description,
+        priority: opts.priority as Priority | undefined,
+        due: opts.due,
+        scheduled: opts.scheduled,
+        start: opts.start,
+        recurrence: opts.recurrence,
+        project: opts.project,
+        date: opts.date,
+      });
+    } catch (err: any) {
+      console.error(chalk.red("Error:"), err.message);
+      process.exit(1);
+    }
 
     const target = opts.project
       ? `project "${opts.project}"`
@@ -261,7 +292,12 @@ program
     }
 
     const task = matches[0];
-    await completeTask(config, task);
+    try {
+      await completeTask(config, task);
+    } catch (err: any) {
+      console.error(chalk.red("Error:"), err.message);
+      process.exit(1);
+    }
     console.log(chalk.green("✓") + " Completed: " + task.description);
   });
 
@@ -620,7 +656,12 @@ program
     }
 
     const task = matches[0];
-    await markTaskStatus(config, task.filePath, task.line, newStatus);
+    try {
+      await markTaskStatus(config, task.filePath, task.line, newStatus);
+    } catch (err: any) {
+      console.error(chalk.red("Error:"), err.message);
+      process.exit(1);
+    }
     console.log(chalk.green("✓") + ` Marked as ${newStatus}: ` + task.description);
   });
 

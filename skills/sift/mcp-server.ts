@@ -117,7 +117,11 @@ const tools: Tool[] = [
         },
         project: {
           type: "string",
-          description: "Only show tasks from this project's file (case-insensitive project name)",
+          description: "Only show tasks from this project's file (case-insensitive project name). When the name resolves to an area, automatically includes tasks from all projects linked to that area.",
+        },
+        groupByProject: {
+          type: "boolean",
+          description: "Group results by project/area. Only applies when 'project' resolves to an area with linked projects.",
         },
       },
     },
@@ -512,6 +516,22 @@ const tools: Tool[] = [
       },
     },
   },
+  // ─── Graph / context tools ─────────────────────────────────
+  {
+    name: "sift_graph",
+    description:
+      "Return the structural context for an area or project using Obsidian backlinks. Buckets all files that link to the target into: projects (child projects), notes (subnotes and reference material), and other (emails, weblinks, etc.). Daily notes and weekly notes are excluded. Use this to orient before doing work on an area — one call reveals what projects and reference material are connected without requiring the user to enumerate them. Requires Obsidian to be running.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Area or project name (wikilink-style resolution, e.g. 'Sift', 'Homelab').",
+        },
+      },
+      required: ["name"],
+    },
+  },
   // ─── Obsidian CLI tools ────────────────────────────────────
   {
     name: "vault_search",
@@ -627,6 +647,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           cliArgs.push("--scheduled-before", args.scheduledBefore as string);
         if (args?.all) cliArgs.push("--all");
         if (args?.project) cliArgs.push("--project", args.project as string);
+        if (args?.groupByProject) cliArgs.push("--group-by-project");
         const result = runSift(cliArgs);
         return {
           content: [{ type: "text", text: result }],
@@ -826,6 +847,59 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{ type: "text", text: result }],
         };
+      }
+
+      // ─── Graph / context tools ─────────────────────────────────
+
+      case "sift_graph": {
+        const raw = runObsidian(["backlinks", `file=${args?.name as string}`, "format=json"]);
+        if (raw.startsWith("Error")) {
+          return { content: [{ type: "text", text: raw }], isError: true };
+        }
+
+        const SKIP_PREFIXES = ["Daily Notes/", "Weekly Notes/"];
+        const PROJECT_PREFIX = "Projects/";
+        const NOTE_PREFIXES = ["Notes/", "Meetings/"];
+
+        let backlinks: Array<{ file: string }>;
+        try {
+          backlinks = JSON.parse(raw);
+        } catch {
+          return { content: [{ type: "text", text: `Error parsing backlinks: ${raw}` }], isError: true };
+        }
+
+        const graph: { projects: string[]; notes: string[]; other: string[] } = {
+          projects: [],
+          notes: [],
+          other: [],
+        };
+
+        for (const { file } of backlinks) {
+          if (SKIP_PREFIXES.some(p => file.startsWith(p))) continue;
+          if (file.startsWith(PROJECT_PREFIX)) {
+            graph.projects.push(file.slice(PROJECT_PREFIX.length).replace(/\.md$/, ""));
+          } else if (NOTE_PREFIXES.some(p => file.startsWith(p))) {
+            graph.notes.push(file);
+          } else {
+            graph.other.push(file);
+          }
+        }
+
+        const lines: string[] = [`Graph: ${args?.name as string}`];
+        if (graph.projects.length) {
+          lines.push("", "Projects:", ...graph.projects.map(p => `  - ${p}`));
+        }
+        if (graph.notes.length) {
+          lines.push("", "Notes:", ...graph.notes.map(n => `  - ${n}`));
+        }
+        if (graph.other.length) {
+          lines.push("", "Other:", ...graph.other.map(o => `  - ${o}`));
+        }
+        if (!graph.projects.length && !graph.notes.length && !graph.other.length) {
+          lines.push("  (no backlinks found)");
+        }
+
+        return { content: [{ type: "text", text: lines.join("\n") }] };
       }
 
       // ─── Obsidian CLI tools ────────────────────────────────────

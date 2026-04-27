@@ -40,31 +40,33 @@ Sift supports two integration approaches:
 2. **MCP Server** (Claude Code & Claude Desktop) — A Model Context Protocol server that provides sift tools directly
 
 All integrations provide these core tools:
-- `sift_list` - List and filter tasks
+- `sift_list` - List and filter tasks. When `project` is an area name, automatically includes tasks from all linked projects. Pass `groupByProject: true` for bucketed output per project.
 - `sift_next` - Get priority tasks
 - `sift_summary` - Quick status overview (includes project list)
 - `sift_add` - Add new tasks (to daily note or project)
 - `sift_find` - Search actionable tasks without modifying them
 - `sift_done` - Complete tasks (by search or precise file:line)
-- `sift_mark` / `sift_mark` - Mark a task with any status (`in_progress`, `on_hold`, `moved`, `cancelled`, `open`, `done`)
-- `sift_projects` - List vault projects (supports `--tag` filter)
-- `sift_project_create` / `sift_projectCreate` - Create a new project
-- `sift_project_path` / `sift_projectPath` - Get a project's file path
-- `sift_project_set` / `sift_projectSet` - Update project metadata (status, timeframe, tags)
-- `sift_note` / `sift_addNote` - Add freeform notes
+- `sift_mark` - Mark a task with any status (`in_progress`, `on_hold`, `moved`, `cancelled`, `open`, `done`)
+- `sift_projects` - List vault projects (supports `--tag` and `--kind` filters)
+- `sift_project_create` - Create a new project
+- `sift_project_path` - Get a project's file path
+- `sift_project_set` - Update project metadata (status, timeframe, tags)
+- `sift_area_create` - Create a new area
+- `sift_area_path` - Get an area's file path
+- `sift_note` - Add freeform notes
+- `sift_subnote` - Create a separate note file linked to a project or area
 - `sift_review` - Generate a review summary (completed, created, new notes, stale, changelog, upcoming)
+- `sift_graph` - Return the structural context for an area or project (child projects, subnotes, other linked files). Requires Obsidian to be running.
 
 Note: Tool names use underscores in MCP (e.g., `sift_project_set`) and camelCase in OpenCode (e.g., `sift_projectSet`).
 
 ## Keeping things up to date
 
-The canonical source files are tracked in the repo:
+The canonical source files are in `skills/sift/`:
 
-- [`packages/agent-skill/mcp-server.ts`](../packages/agent-skill/mcp-server.ts) -- MCP server for Claude Code/Desktop
-- [`packages/agent-skill/SKILL.md`](../packages/agent-skill/SKILL.md) -- Agent skill definition
-- [`packages/agent-skill/tools/sift.ts`](../packages/agent-skill/tools/sift.ts) -- OpenCode custom tools
-
-The `skills/sift/` directory contains symlinks to these files for `npx skills add` compatibility.
+- [`skills/sift/mcp-server.ts`](../skills/sift/mcp-server.ts) -- MCP server for Claude Code/Desktop
+- [`skills/sift/SKILL.md`](../skills/sift/SKILL.md) -- Agent skill definition
+- [`skills/sift/tools/sift.ts`](../skills/sift/tools/sift.ts) -- OpenCode custom tools
 
 When you make changes:
 
@@ -76,7 +78,7 @@ npx skills add dru89/sift -g -y
 
 **For MCP server (Claude Code/Desktop):**
 ```bash
-npm run build --workspace=packages/agent-skill
+npm run build --workspace=skills/sift
 # Then restart Claude Desktop and/or Claude Code
 ```
 
@@ -114,19 +116,23 @@ The tools file (`sift.ts`) defines OpenCode custom tools that call the `sift` CL
 
 | Tool name | Description |
 |-----------|-------------|
-| `sift_list` | List open tasks, with optional search/priority/date filters |
+| `sift_list` | List open tasks, with optional search/priority/date filters. Area names expand to include linked projects; use `groupByProject: true` for bucketed output. |
 | `sift_next` | Get the most important tasks sorted by urgency |
 | `sift_summary` | Quick overview of task status + active projects |
 | `sift_add` | Add a new task to today's daily note or a project |
 | `sift_find` | Search actionable tasks without modifying them |
 | `sift_done` | Mark a task as complete (by search or by file:line) |
 | `sift_mark` | Mark a task with any status: open, in_progress, on_hold, moved, cancelled, done |
-| `sift_projects` | List all projects in the vault (optional `tag` filter) |
-| `sift_projectCreate` | Create a new project from template |
-| `sift_projectPath` | Get the file path for a project |
-| `sift_projectSet` | Update project metadata: status, timeframe, tags |
-| `sift_addNote` | Add a freeform note to daily note or project |
+| `sift_projects` | List all projects and areas in the vault (optional `tag` and `kind` filters) |
+| `sift_project_create` | Create a new project from template |
+| `sift_project_path` | Get the file path for a project |
+| `sift_project_set` | Update project metadata: status, timeframe, tags |
+| `sift_area_create` | Create a new area from template |
+| `sift_area_path` | Get the file path for an area |
+| `sift_note` | Add a freeform note to daily note, project, or area |
+| `sift_subnote` | Create a separate note file linked to a project or area |
 | `sift_review` | Generate a review summary (completed, created, new notes, stale, changelog, upcoming) |
+| `sift_graph` | Structural context for an area/project via backlinks: child projects, subnotes, other linked files. Requires Obsidian. |
 
 The tools resolve the CLI in this order:
 1. `SIFT_CLI_PATH` environment variable (absolute path to the built CLI entry point)
@@ -164,7 +170,7 @@ MCP servers are configured in `~/Library/Application Support/Claude/claude_deskt
   "mcpServers": {
     "sift": {
       "command": "node",
-      "args": ["/path/to/sift/packages/agent-skill/dist/mcp-server.js"],
+      "args": ["/path/to/sift/skills/sift/dist/mcp-server.js"],
       "env": {
         "SIFT_CLI_PATH": "/path/to/sift/packages/cli/dist/index.js"
       }
@@ -184,7 +190,7 @@ MCP servers are configured globally in `~/.claude.json`:
   "mcpServers": {
     "sift": {
       "command": "node",
-      "args": ["/path/to/sift/packages/agent-skill/dist/mcp-server.js"]
+      "args": ["/path/to/sift/skills/sift/dist/mcp-server.js"]
     }
   }
 }
@@ -215,19 +221,19 @@ If you prefer to set things up manually instead of using `npx skills add`:
 ```bash
 # Claude Code
 mkdir -p ~/.claude/skills/sift
-cp packages/agent-skill/SKILL.md ~/.claude/skills/sift/SKILL.md
+cp skills/sift/SKILL.md ~/.claude/skills/sift/SKILL.md
 
 # OpenCode
 mkdir -p ~/.config/opencode/skills/sift
-cp packages/agent-skill/SKILL.md ~/.config/opencode/skills/sift/SKILL.md
-cp packages/agent-skill/tools/sift.ts ~/.config/opencode/tools/sift.ts
+cp skills/sift/SKILL.md ~/.config/opencode/skills/sift/SKILL.md
+cp skills/sift/tools/sift.ts ~/.config/opencode/tools/sift.ts
 ```
 
 ### MCP server (Claude Code & Claude Desktop)
 
 Build the MCP server:
 ```bash
-npm run build --workspace=packages/agent-skill
+npm run build --workspace=skills/sift
 ```
 
 For Claude Desktop, add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
@@ -236,7 +242,7 @@ For Claude Desktop, add to `~/Library/Application Support/Claude/claude_desktop_
   "mcpServers": {
     "sift": {
       "command": "node",
-      "args": ["/absolute/path/to/sift/packages/agent-skill/dist/mcp-server.js"]
+      "args": ["/absolute/path/to/sift/skills/sift/dist/mcp-server.js"]
     }
   }
 }
@@ -248,7 +254,7 @@ For Claude Code, add to `~/.claude.json`:
   "mcpServers": {
     "sift": {
       "command": "node",
-      "args": ["/absolute/path/to/sift/packages/agent-skill/dist/mcp-server.js"]
+      "args": ["/absolute/path/to/sift/skills/sift/dist/mcp-server.js"]
     }
   }
 }

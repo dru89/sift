@@ -49,7 +49,7 @@ export async function scanTasks(
     }
 
     // Apply file pattern filter early to avoid reading unnecessary files
-    if (filter?.filePattern && !file.includes(filter.filePattern)) {
+    if (filter?.filePatterns?.length && !filter.filePatterns.some(p => file.includes(p))) {
       continue;
     }
 

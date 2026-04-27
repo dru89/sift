@@ -86,6 +86,33 @@ export function formatTaskList(tasks: Task[], header: string, options?: FormatTa
 }
 
 /**
+ * A named group of tasks, used for grouped display.
+ */
+export interface TaskGroup {
+  label: string;
+  tasks: Task[];
+}
+
+/**
+ * Format tasks grouped by project/area, with a header per group.
+ */
+export function formatGroupedTaskList(groups: TaskGroup[], options?: FormatTaskOptions): string {
+  const parts: string[] = [];
+  for (const group of groups) {
+    const lines = [chalk.bold(group.label)];
+    if (group.tasks.length === 0) {
+      lines.push(chalk.dim("  (no tasks)"));
+    } else {
+      for (const task of group.tasks) {
+        lines.push("  " + formatTask(task, options));
+      }
+    }
+    parts.push(lines.join("\n"));
+  }
+  return parts.join("\n\n");
+}
+
+/**
  * Format a summary of task counts.
  */
 export function formatSummary(tasks: Task[]): string {
