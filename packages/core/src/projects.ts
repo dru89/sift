@@ -88,6 +88,8 @@ export async function listProjects(
         tags: Array.isArray(frontmatter.tags) && frontmatter.tags.length > 0 ? frontmatter.tags : undefined,
         created: scalar(frontmatter.created),
         area: parseAreaRef(frontmatter.area),
+        lastReviewed: scalar(frontmatter.lastReviewed),
+        reviewInterval: frontmatter.reviewInterval ? parseInt(String(frontmatter.reviewInterval), 10) || undefined : undefined,
       });
     }
   }

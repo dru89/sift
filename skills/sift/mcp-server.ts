@@ -504,6 +504,106 @@ const tools: Tool[] = [
     },
   },
   {
+    name: "sift_update",
+    description:
+      "Modify a task's metadata in place (dates, priority). Operates by file + line like sift_done and sift_mark. Use sift_find first to locate the task. IMPORTANT: You MUST call sift_find first, show the user the exact task you found, and get their explicit confirmation BEFORE calling this tool.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: {
+          type: "string",
+          description: "Absolute file path from sift_find output (also accepts vault-relative paths). Required.",
+        },
+        line: {
+          type: "number",
+          description: "Line number (1-indexed) from sift_find output. Required.",
+        },
+        description: {
+          type: "string",
+          description: "Partial task text for safety verification.",
+        },
+        priority: {
+          type: "string",
+          enum: ["highest", "high", "low", "lowest", "none"],
+          description: "New priority level, or 'none' to remove priority.",
+        },
+        due: {
+          type: "string",
+          description: "New due date (YYYY-MM-DD), or 'none' to remove.",
+        },
+        scheduled: {
+          type: "string",
+          description: "New scheduled date (YYYY-MM-DD), or 'none' to remove.",
+        },
+        start: {
+          type: "string",
+          description: "New start date (YYYY-MM-DD), or 'none' to remove.",
+        },
+      },
+      required: ["file", "line"],
+    },
+  },
+  {
+    name: "sift_move",
+    description:
+      "Move a task from one file to another. Removes the task from the source file and inserts it in the destination. Use sift_find first to locate the task. IMPORTANT: This is a destructive operation. You MUST call sift_find first, show the user the exact task and intended destination, and get their explicit confirmation BEFORE calling this tool.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: {
+          type: "string",
+          description: "Source file path (absolute or vault-relative). Required.",
+        },
+        line: {
+          type: "number",
+          description: "Source line number (1-indexed). Required.",
+        },
+        description: {
+          type: "string",
+          description: "Partial task text for safety verification.",
+        },
+        project: {
+          type: "string",
+          description: "Destination project or area name (inserts under ## Tasks). Use this OR 'date', not both.",
+        },
+        date: {
+          type: "string",
+          description: "Destination daily note date YYYY-MM-DD (inserts under ## Journal). Use this OR 'project', not both.",
+        },
+      },
+      required: ["file", "line"],
+    },
+  },
+  {
+    name: "sift_project_review",
+    description:
+      "Stamp lastReviewed: today on a project or area's frontmatter. Call this after reviewing a project's tasks and status during a review session.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "The project or area name to mark as reviewed.",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "sift_triage",
+    description:
+      "Return a tiered project review summary. Tier 1: projects needing attention (stale tasks, inactive, overdue reviews, orphan mentions). Tier 2: due for review but look healthy (name, task count, top tasks). Tier 3: not due (names only). Plus loose tasks from recent daily notes. Use this to run a project review session.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: {
+          type: "string",
+          description: "Optional: get full detail on a single project instead of the full triage.",
+        },
+      },
+    },
+  },
+  {
     name: "sift_review",
     description:
       "Generate a review summary for a time period. Shows tasks completed, tasks created (still open), tasks needing triage (no dates or stale high-priority), project changelog entries, and upcoming tasks. Defaults to since last Friday.",
@@ -850,6 +950,62 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             isError: true,
           };
         }
+        const result = runSift(cliArgs);
+        return { content: [{ type: "text", text: result }] };
+      }
+
+      case "sift_update": {
+        if (!args?.file || !args?.line) {
+          return {
+            content: [{ type: "text", text: "Error: 'file' and 'line' are required." }],
+            isError: true,
+          };
+        }
+        const cliArgs = ["update", "--file", args.file as string, "--line", String(args.line)];
+        if (args.description) cliArgs.push("--description", args.description as string);
+        if (args.priority) cliArgs.push("--priority", args.priority as string);
+        if (args.due) cliArgs.push("--due", args.due as string);
+        if (args.scheduled) cliArgs.push("--scheduled", args.scheduled as string);
+        if (args.start) cliArgs.push("--start", args.start as string);
+        const result = runSift(cliArgs);
+        return { content: [{ type: "text", text: result }] };
+      }
+
+      case "sift_move": {
+        if (!args?.file || !args?.line) {
+          return {
+            content: [{ type: "text", text: "Error: 'file' and 'line' are required." }],
+            isError: true,
+          };
+        }
+        if (!args?.project && !args?.date) {
+          return {
+            content: [{ type: "text", text: "Error: provide either 'project' or 'date' as the destination." }],
+            isError: true,
+          };
+        }
+        const cliArgs = ["move", "--file", args.file as string, "--line", String(args.line)];
+        if (args.description) cliArgs.push("--description", args.description as string);
+        if (args.project) cliArgs.push("--project", args.project as string);
+        if (args.date) cliArgs.push("--date", args.date as string);
+        const result = runSift(cliArgs);
+        return { content: [{ type: "text", text: result }] };
+      }
+
+      case "sift_project_review": {
+        if (!args?.name) {
+          return {
+            content: [{ type: "text", text: "Error: 'name' is required." }],
+            isError: true,
+          };
+        }
+        const result = runSift(["project", "review", "--", args.name as string]);
+        return { content: [{ type: "text", text: result }] };
+      }
+
+      case "sift_triage": {
+        const cliArgs = ["triage", "--absolute"];
+        if (args?.project) cliArgs.push("--project", args.project as string);
         const result = runSift(cliArgs);
         return { content: [{ type: "text", text: result }] };
       }

@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { glob } from "glob";
 import { parseContent } from "./parser.js";
-import { localToday, addDays, previousDayOfWeek } from "./dates.js";
+import { localToday, addDays, previousDayOfWeek, daysBetween } from "./dates.js";
 import { type Task, type TaskFilter, type SiftConfig, type Priority, type ChangelogEntry, type VaultFile, type ReviewSummary, ACTIONABLE_STATUSES } from "./types.js";
 
 /**
@@ -123,18 +123,6 @@ export function computeUrgency(task: Task, today?: string): number {
   }
 
   return score;
-}
-
-/**
- * Compute the number of days between two YYYY-MM-DD date strings.
- * Returns positive if `to` is after `from`, negative if before.
- */
-function daysBetween(from: string, to: string): number {
-  const [fy, fm, fd] = from.split("-").map(Number);
-  const [ty, tm, td] = to.split("-").map(Number);
-  const fromDate = new Date(fy, fm - 1, fd);
-  const toDate = new Date(ty, tm - 1, td);
-  return Math.round((toDate.getTime() - fromDate.getTime()) / 86400000);
 }
 
 /**

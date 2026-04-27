@@ -43,3 +43,15 @@ export function previousDayOfWeek(from: string, dayOfWeek: number): string {
   if (diff === 0) return from;
   return addDays(from, -diff);
 }
+
+/**
+ * Calculate the number of days between two YYYY-MM-DD date strings.
+ * Returns positive if `to` is after `from`, negative if before.
+ */
+export function daysBetween(from: string, to: string): number {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  const fromDate = new Date(fy, fm - 1, fd);
+  const toDate = new Date(ty, tm - 1, td);
+  return Math.round((toDate.getTime() - fromDate.getTime()) / 86400000);
+}

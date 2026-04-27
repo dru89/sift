@@ -12,6 +12,7 @@ import {
   getOverdueTasks,
   getDueToday,
   getReviewSummary,
+  getTriageSummary,
   sortByUrgency,
   addTask,
   addNote,
@@ -19,6 +20,8 @@ import {
   completeTask,
   findTasks,
   markTaskStatus,
+  updateTask,
+  moveTask,
   listProjects,
   findProject,
   createProject,
@@ -32,6 +35,7 @@ import {
   type TaskStatus,
   type SiftConfig,
   type Task,
+  type TriageSignal,
 } from "@sift/core";
 import { formatTask, formatTaskList, formatGroupedTaskList, formatSummary, type FormatTaskOptions, type TaskGroup } from "./format.js";
 
@@ -208,9 +212,9 @@ program
     const config = await resolveConfig();
     const description = descriptionParts.join(" ");
 
-    let taskLine: string;
+    let result: { taskLine: string; reopened: boolean };
     try {
-      taskLine = await addTask(config, {
+      result = await addTask(config, {
         description,
         priority: opts.priority as Priority | undefined,
         due: opts.due,
@@ -231,7 +235,10 @@ program
         ? `daily note for ${opts.date}`
         : "today's daily note";
     console.log(chalk.green("✓") + ` Added task to ${target}:`);
-    console.log("  " + taskLine);
+    console.log("  " + result.taskLine);
+    if (result.reopened) {
+      console.log(chalk.yellow("  ⚠ Reopened project (was marked done)"));
+    }
   });
 
 // ─── sift find ───────────────────────────────────────────────
@@ -562,6 +569,24 @@ projectCmd
     }
   });
 
+// ─── sift project review ────────────────────────────────────
+projectCmd
+  .command("review <name...>")
+  .description("Mark a project as reviewed (stamps lastReviewed: today in frontmatter)")
+  .action(async (nameParts: string[]) => {
+    const config = await resolveConfig();
+    const name = nameParts.join(" ");
+    const today = localToday();
+
+    try {
+      await setProjectField(config, name, "lastReviewed", today);
+      console.log(chalk.green("✓") + ` Marked "${name}" as reviewed (${today})`);
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
+    }
+  });
+
 // ─── sift area ──────────────────────────────────────────────
 const areaCmd = program
   .command("area")
@@ -688,6 +713,98 @@ program
       process.exit(1);
     }
     console.log(chalk.green("✓") + ` Marked as ${newStatus}: ` + task.description);
+  });
+
+// ─── sift update ─────────────────────────────────────────────
+program
+  .command("update")
+  .description("Update a task's metadata (dates, priority) in place")
+  .requiredOption("--file <path>", "File path (relative to vault root, or absolute)")
+  .requiredOption("--line <number>", "Line number (1-indexed)")
+  .option("--description <text>", "Expected task text (safety check against stale line numbers)")
+  .option("--priority <level>", "New priority: highest, high, low, lowest, none")
+  .option("--due <date>", "New due date (YYYY-MM-DD), or 'none' to remove")
+  .option("--scheduled <date>", "New scheduled date (YYYY-MM-DD), or 'none' to remove")
+  .option("--start <date>", "New start date (YYYY-MM-DD), or 'none' to remove")
+  .action(async (opts) => {
+    const config = await resolveConfig();
+
+    const lineNum = parseInt(opts.line, 10);
+    if (isNaN(lineNum) || lineNum < 1) {
+      console.error(chalk.red("Invalid line number: ") + opts.line);
+      process.exit(1);
+    }
+
+    const hasUpdate = opts.priority || opts.due || opts.scheduled || opts.start;
+    if (!hasUpdate) {
+      console.error(chalk.red("Error: ") + "Specify at least one field to update (--priority, --due, --scheduled, --start)");
+      process.exit(1);
+    }
+
+    try {
+      const result = await updateTask(config, {
+        file: opts.file,
+        line: lineNum,
+        description: opts.description,
+        priority: opts.priority as Priority | undefined,
+        due: opts.due,
+        scheduled: opts.scheduled,
+        start: opts.start,
+      });
+
+      console.log(chalk.green("✓") + ` Updated: ${result.description}`);
+      console.log("  " + result.updatedLine);
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
+    }
+  });
+
+// ─── sift move ───────────────────────────────────────────────
+program
+  .command("move")
+  .description("Move a task from one file to another")
+  .requiredOption("--file <path>", "Source file path (relative to vault root, or absolute)")
+  .requiredOption("--line <number>", "Source line number (1-indexed)")
+  .option("--description <text>", "Expected task text (safety check against stale line numbers)")
+  .option("--project <name>", "Destination project or area name (inserts under ## Tasks)")
+  .option("--date <date>", "Destination daily note date YYYY-MM-DD (inserts under ## Journal)")
+  .action(async (opts) => {
+    const config = await resolveConfig();
+
+    const lineNum = parseInt(opts.line, 10);
+    if (isNaN(lineNum) || lineNum < 1) {
+      console.error(chalk.red("Invalid line number: ") + opts.line);
+      process.exit(1);
+    }
+
+    if (!opts.project && !opts.date) {
+      console.error(chalk.red("Error: ") + "Specify a destination: --project <name> or --date <YYYY-MM-DD>");
+      process.exit(1);
+    }
+
+    if (opts.project && opts.date) {
+      console.error(chalk.red("Error: ") + "Specify either --project or --date, not both.");
+      process.exit(1);
+    }
+
+    try {
+      const result = await moveTask(config, {
+        file: opts.file,
+        line: lineNum,
+        description: opts.description,
+        project: opts.project,
+        date: opts.date,
+      });
+
+      console.log(chalk.green("✓") + ` Moved to ${result.destination}: ${result.description}`);
+      if (result.reopened) {
+        console.log(chalk.yellow("  ⚠ Reopened project (was marked done)"));
+      }
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
+    }
   });
 
 // ─── sift review ─────────────────────────────────────────────
@@ -819,6 +936,124 @@ program
       console.log();
     }
   });
+
+// ─── sift triage ─────────────────────────────────────────────
+program
+  .command("triage")
+  .description("Review projects and surface tasks that need attention")
+  .option("--project <name>", "Show full detail for a single project")
+  .option("--absolute", "Show absolute file paths instead of vault-relative")
+  .action(async (opts) => {
+    const config = await resolveConfig();
+
+    const summary = await getTriageSummary(config, {
+      project: opts.project,
+    });
+
+    const fmtOpts: FormatTaskOptions = {
+      showFile: true,
+      vaultPath: opts.absolute ? config.vaultPath : undefined,
+    };
+
+    // ── Tier 1: Needs attention ───────────────────────────────
+    if (summary.tier1.length > 0) {
+      console.log(chalk.bold.red(`Tier 1 — Needs attention (${summary.tier1.length})`));
+      for (const item of summary.tier1) {
+        console.log();
+        const parts = [chalk.bold.white(`  ${item.project.name}`)];
+        if (item.project.lastReviewed) {
+          parts.push(chalk.dim(`last reviewed: ${item.project.lastReviewed}`));
+        }
+        if (item.lastActivityDate) {
+          parts.push(chalk.dim(`last activity: ${item.lastActivityDate}`));
+        }
+        console.log(parts.join("  "));
+
+        // Show why
+        const whyParts: string[] = [];
+        for (const signal of item.signals) {
+          whyParts.push(formatSignal(signal));
+        }
+        console.log(chalk.yellow(`    Why: ${whyParts.join(", ")}`));
+
+        // Show tasks
+        if (item.tasks.length > 0) {
+          console.log(chalk.dim("    Tasks:"));
+          for (const task of item.tasks) {
+            console.log("      " + formatTask(task, fmtOpts));
+          }
+        }
+      }
+      console.log();
+    }
+
+    // ── Tier 2: Quick check ───────────────────────────────────
+    if (summary.tier2.length > 0) {
+      console.log(chalk.bold.yellow(`Tier 2 — Quick check (${summary.tier2.length})`));
+      for (const item of summary.tier2) {
+        const parts = [chalk.white(`  ${item.project.name}`)];
+        parts.push(chalk.dim(`${item.openTaskCount} open tasks`));
+        if (item.lastActivityDate) {
+          parts.push(chalk.dim(`last activity: ${item.lastActivityDate}`));
+        }
+        console.log(parts.join("  "));
+
+        for (const task of item.topTasks) {
+          console.log("    " + formatTask(task, fmtOpts));
+        }
+      }
+      console.log();
+    }
+
+    // ── Tier 3: Not due ───────────────────────────────────────
+    if (summary.tier3.length > 0) {
+      console.log(chalk.bold.dim(`Tier 3 — Not due (${summary.tier3.reduce((n, g) => n + g.names.length, 0)})`));
+      for (const group of summary.tier3) {
+        console.log(`  ${chalk.dim(group.status + ":")} ${group.names.join(", ")}`);
+      }
+      console.log();
+    }
+
+    // ── Loose tasks ───────────────────────────────────────────
+    if (summary.looseTasks.length > 0) {
+      console.log(chalk.bold(`Loose tasks — daily note orphans (${summary.looseTasks.length})`));
+      for (const orphan of summary.looseTasks) {
+        let line = "  " + formatTask(orphan.task, fmtOpts);
+        if (orphan.mentionedProjects.length > 0) {
+          line += chalk.cyan(`  → ${orphan.mentionedProjects.join(", ")}`);
+        }
+        console.log(line);
+      }
+      console.log();
+    }
+
+    // If everything is clean
+    if (summary.tier1.length === 0 && summary.tier2.length === 0 && summary.looseTasks.length === 0) {
+      console.log(chalk.green("All projects are reviewed and healthy. No loose tasks found."));
+    }
+  });
+
+/**
+ * Format a triage signal as a human-readable string for CLI output.
+ */
+function formatSignal(signal: TriageSignal): string {
+  switch (signal.kind) {
+    case "overdue_review":
+      return signal.lastReviewed
+        ? `review overdue (last: ${signal.lastReviewed}, interval: ${signal.intervalDays}d)`
+        : `never reviewed (interval: ${signal.intervalDays}d)`;
+    case "stale_tasks":
+      return `${signal.count} high-priority task${signal.count > 1 ? "s" : ""} with stale scheduled dates`;
+    case "undated_tasks":
+      return `${signal.count} undated task${signal.count > 1 ? "s" : ""}`;
+    case "inactive":
+      return `no activity in ${signal.weeks} weeks (last: ${signal.lastActivityDate ?? "unknown"})`;
+    case "orphan_mentions":
+      return `${signal.count} orphaned daily-note task${signal.count > 1 ? "s" : ""} mention this project`;
+    case "done_with_open_tasks":
+      return `marked done but has ${signal.openCount} open task${signal.openCount > 1 ? "s" : ""}`;
+  }
+}
 
 // ─── sift init ───────────────────────────────────────────────
 program

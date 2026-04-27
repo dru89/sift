@@ -540,3 +540,109 @@ export const review = tool({
   },
 });
 
+export const update = tool({
+  description:
+    "Modify a task's metadata in place (dates, priority). Operates by file + line like sift_done and sift_mark. Use sift_find first to locate the task.",
+  args: {
+    file: tool.schema
+      .string()
+      .describe("Absolute file path for the task (also accepts vault-relative). Required."),
+    line: tool.schema
+      .number()
+      .describe("Line number (1-indexed). Required."),
+    description: tool.schema
+      .string()
+      .optional()
+      .describe("Partial task text for safety verification."),
+    priority: tool.schema
+      .enum(["highest", "high", "low", "lowest", "none"])
+      .optional()
+      .describe("New priority level, or 'none' to remove priority."),
+    due: tool.schema
+      .string()
+      .optional()
+      .describe("New due date (YYYY-MM-DD), or 'none' to remove."),
+    scheduled: tool.schema
+      .string()
+      .optional()
+      .describe("New scheduled date (YYYY-MM-DD), or 'none' to remove."),
+    start: tool.schema
+      .string()
+      .optional()
+      .describe("New start date (YYYY-MM-DD), or 'none' to remove."),
+  },
+  async execute(args) {
+    const cliArgs = ["update", "--file", args.file, "--line", String(args.line)];
+    if (args.description) cliArgs.push("--description", args.description);
+    if (args.priority) cliArgs.push("--priority", args.priority);
+    if (args.due) cliArgs.push("--due", args.due);
+    if (args.scheduled) cliArgs.push("--scheduled", args.scheduled);
+    if (args.start) cliArgs.push("--start", args.start);
+    return runSift(cliArgs);
+  },
+});
+
+export const move = tool({
+  description:
+    "Move a task from one file to another. Removes the task from the source file and inserts it in the destination under the appropriate heading (## Tasks for projects/areas, ## Journal for daily notes). This is a destructive operation — always confirm with the user before calling.",
+  args: {
+    file: tool.schema
+      .string()
+      .describe("Source file path (absolute or vault-relative). Required."),
+    line: tool.schema
+      .number()
+      .describe("Source line number (1-indexed). Required."),
+    description: tool.schema
+      .string()
+      .optional()
+      .describe("Partial task text for safety verification."),
+    project: tool.schema
+      .string()
+      .optional()
+      .describe("Destination project or area name (inserts under ## Tasks). Use this OR 'date', not both."),
+    date: tool.schema
+      .string()
+      .optional()
+      .describe("Destination daily note date YYYY-MM-DD (inserts under ## Journal). Use this OR 'project', not both."),
+  },
+  async execute(args) {
+    if (!args.project && !args.date) {
+      return "Error: provide either 'project' or 'date' as the destination.";
+    }
+    const cliArgs = ["move", "--file", args.file, "--line", String(args.line)];
+    if (args.description) cliArgs.push("--description", args.description);
+    if (args.project) cliArgs.push("--project", args.project);
+    if (args.date) cliArgs.push("--date", args.date);
+    return runSift(cliArgs);
+  },
+});
+
+export const project_review = tool({
+  description:
+    "Stamp lastReviewed: today on a project or area's frontmatter. Call this after reviewing a project's tasks and status during a review session.",
+  args: {
+    name: tool.schema
+      .string()
+      .describe("The project or area name to mark as reviewed."),
+  },
+  async execute(args) {
+    return runSift(["project", "review", "--", args.name]);
+  },
+});
+
+export const triage = tool({
+  description:
+    "Return a tiered project review summary. Tier 1: projects needing attention (stale tasks, inactive, overdue reviews, orphan mentions). Tier 2: due for review but look healthy (name, task count, top tasks). Tier 3: not due (names only). Plus loose tasks from recent daily notes. Use this to run a project review session.",
+  args: {
+    project: tool.schema
+      .string()
+      .optional()
+      .describe("Optional: get full detail on a single project instead of the full triage."),
+  },
+  async execute(args) {
+    const cliArgs = ["triage", "--absolute"];
+    if (args.project) cliArgs.push("--project", args.project);
+    return runSift(cliArgs);
+  },
+});
+

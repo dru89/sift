@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { formatTask, statusToChar } from "./parser.js";
+import { parseLine, formatTask, statusToChar } from "./parser.js";
 import { localToday, addDays } from "./dates.js";
 import { scanTasks, matchesSearch } from "./scanner.js";
 import { findProject } from "./projects.js";
@@ -107,20 +107,33 @@ export interface SubnoteResult {
 }
 
 /**
+ * Result of adding a task.
+ */
+export interface AddTaskResult {
+  /** The formatted task line that was written */
+  taskLine: string;
+  /** Whether the target project was reopened (was "done", now "active") */
+  reopened: boolean;
+}
+
+/**
  * Add a new task to today's daily note, or to a project file if specified.
  *
  * When `options.project` is provided, the task is added under the "## Tasks"
  * heading in the matching project file. Otherwise it goes under "## Journal"
  * in today's daily note.
  *
+ * If the target project has `status: done`, it is automatically reopened
+ * (set to "active") before adding the task.
+ *
  * @param config - The sift configuration
  * @param options - The task details
- * @returns The formatted task string that was written
+ * @returns The formatted task string that was written, plus a `reopened` flag
  */
 export async function addTask(
   config: SiftConfig,
   options: NewTaskOptions,
-): Promise<string> {
+): Promise<AddTaskResult> {
   // For project files, include created date since it's not implicit from the filename.
   // For daily notes, creation date is implicit from the note's date.
   const created = options.project ? localToday() : null;
@@ -141,7 +154,8 @@ export async function addTask(
     return addTaskToProject(config, options.project, taskLine);
   }
 
-  return addTaskToDailyNote(config, taskLine, options.date);
+  const written = await addTaskToDailyNote(config, taskLine, options.date);
+  return { taskLine: written, reopened: false };
 }
 
 /**
@@ -439,6 +453,271 @@ export async function markTaskStatus(
   return descMatch ? descMatch[1].trim() : targetLine.trim();
 }
 
+/**
+ * Options for updating a task's metadata in place.
+ * At least one of the optional fields must be provided.
+ */
+export interface UpdateTaskOptions {
+  /** File path (relative to vault root, or absolute) */
+  file: string;
+  /** 1-indexed line number */
+  line: number;
+  /** Optional partial text the task must contain (safety check against stale line numbers) */
+  description?: string;
+  /** New priority level, or "none" to remove */
+  priority?: Priority;
+  /** New due date (YYYY-MM-DD), or "none" to remove */
+  due?: string;
+  /** New scheduled date (YYYY-MM-DD), or "none" to remove */
+  scheduled?: string;
+  /** New start date (YYYY-MM-DD), or "none" to remove */
+  start?: string;
+}
+
+/**
+ * Result of updating a task.
+ */
+export interface UpdateTaskResult {
+  /** The task description (for confirmation messages) */
+  description: string;
+  /** The updated line as written to the file */
+  updatedLine: string;
+}
+
+/**
+ * Update a task's metadata (dates, priority) in place.
+ *
+ * Parses the existing task line, replaces the requested fields, re-formats
+ * the line, and writes it back. Fields not specified in `options` are left
+ * unchanged. Pass "none" for a date or priority field to remove it.
+ *
+ * @param config - The sift configuration
+ * @param options - What to update
+ * @returns The description and updated line
+ */
+export async function updateTask(
+  config: SiftConfig,
+  options: UpdateTaskOptions,
+): Promise<UpdateTaskResult> {
+  const normalizedPath = normalizeFilePath(config, options.file);
+  const fullPath = path.join(config.vaultPath, normalizedPath);
+  const content = await fs.readFile(fullPath, "utf-8");
+  const lines = content.split("\n");
+
+  const lineIdx = options.line - 1;
+  if (lineIdx < 0 || lineIdx >= lines.length) {
+    throw new Error(`Line ${options.line} out of range in ${normalizedPath}`);
+  }
+
+  const targetLine = lines[lineIdx];
+  if (!targetLine.match(/- \[.\]/)) {
+    throw new Error(
+      `Line ${options.line} in ${normalizedPath} is not a task: "${targetLine.trim()}"`,
+    );
+  }
+
+  // Safety check: verify the task description matches what the caller expects
+  if (options.description) {
+    verifyDescription(targetLine, options.description, options.line, normalizedPath);
+  }
+
+  // Parse the existing task to get all current metadata
+  const task = parseLine(targetLine, normalizedPath, options.line);
+  if (!task) {
+    throw new Error(
+      `Line ${options.line} in ${normalizedPath} could not be parsed as a task`,
+    );
+  }
+
+  // Apply updates — "none" means remove, undefined means keep existing
+  const updatedPriority = options.priority !== undefined
+    ? (options.priority === "none" ? "none" : options.priority)
+    : task.priority;
+
+  const updatedDue = options.due !== undefined
+    ? (options.due === "none" ? null : options.due)
+    : task.due;
+
+  const updatedScheduled = options.scheduled !== undefined
+    ? (options.scheduled === "none" ? null : options.scheduled)
+    : task.scheduled;
+
+  const updatedStart = options.start !== undefined
+    ? (options.start === "none" ? null : options.start)
+    : task.start;
+
+  // Re-format the task line with updated metadata
+  const updatedLine = formatTask({
+    description: task.description,
+    status: task.status,
+    priority: updatedPriority,
+    scheduled: updatedScheduled,
+    due: updatedDue,
+    start: updatedStart,
+    done: task.done,
+    created: task.created,
+    recurrence: task.recurrence,
+  });
+
+  lines[lineIdx] = updatedLine;
+  await fs.writeFile(fullPath, lines.join("\n"), "utf-8");
+
+  return {
+    description: task.description,
+    updatedLine,
+  };
+}
+
+/**
+ * Options for moving a task from one file to another.
+ */
+export interface MoveTaskOptions {
+  /** Source file path (relative to vault root, or absolute) */
+  file: string;
+  /** 1-indexed line number of the task in the source file */
+  line: number;
+  /** Optional partial text the task must contain (safety check against stale line numbers) */
+  description?: string;
+  /** Destination project or area name (inserts under ## Tasks). Mutually exclusive with `date`. */
+  project?: string;
+  /** Destination daily note date YYYY-MM-DD (inserts under ## Journal). Mutually exclusive with `project`. */
+  date?: string;
+}
+
+/**
+ * Result of moving a task.
+ */
+export interface MoveTaskResult {
+  /** The task description */
+  description: string;
+  /** The task line as written to the destination */
+  taskLine: string;
+  /** Where the task was moved to (for confirmation messages) */
+  destination: string;
+  /** Whether the destination project was reopened (was "done", now "active") */
+  reopened?: boolean;
+}
+
+/**
+ * Move a task from one file to another.
+ *
+ * Removes the task line from the source file and inserts it in the
+ * destination file under the appropriate heading (## Tasks for projects/areas,
+ * ## Journal for daily notes).
+ *
+ * Write order: destination first, then source — so if the second write fails,
+ * the task exists in both places (safe) rather than neither (data loss).
+ *
+ * Exactly one of `options.project` or `options.date` must be provided.
+ *
+ * @param config - The sift configuration
+ * @param options - Source location and destination
+ * @returns Info about the moved task
+ */
+export async function moveTask(
+  config: SiftConfig,
+  options: MoveTaskOptions,
+): Promise<MoveTaskResult> {
+  if (!options.project && !options.date) {
+    throw new Error("Provide either 'project' or 'date' as the destination.");
+  }
+  if (options.project && options.date) {
+    throw new Error("Provide either 'project' or 'date', not both.");
+  }
+
+  // ── Read and validate the source ──────────────────────────
+  const normalizedSourcePath = normalizeFilePath(config, options.file);
+  const sourceFullPath = path.join(config.vaultPath, normalizedSourcePath);
+  const sourceContent = await fs.readFile(sourceFullPath, "utf-8");
+  const sourceLines = sourceContent.split("\n");
+
+  const lineIdx = options.line - 1;
+  if (lineIdx < 0 || lineIdx >= sourceLines.length) {
+    throw new Error(`Line ${options.line} out of range in ${normalizedSourcePath}`);
+  }
+
+  const taskLine = sourceLines[lineIdx];
+  if (!taskLine.match(/- \[.\]/)) {
+    throw new Error(
+      `Line ${options.line} in ${normalizedSourcePath} is not a task: "${taskLine.trim()}"`,
+    );
+  }
+
+  if (options.description) {
+    verifyDescription(taskLine, options.description, options.line, normalizedSourcePath);
+  }
+
+  // Extract description for the result
+  const descMatch = taskLine.match(/- \[.\]\s+(.*)/);
+  const description = descMatch ? descMatch[1].trim() : taskLine.trim();
+
+  // ── Resolve the destination ───────────────────────────────
+  let destFullPath: string;
+  let destHeading: string;
+  let destination: string;
+  let reopened = false;
+
+  if (options.project) {
+    const project = await findProject(config, options.project);
+    if (!project) {
+      throw new Error(
+        `Project "${options.project}" not found. Use "sift projects" to see available projects.`,
+      );
+    }
+    destFullPath = path.join(config.vaultPath, project.filePath);
+    destHeading = "## Tasks";
+    destination = `${project.kind} "${project.name}"`;
+
+    // Auto-reopen done projects when moving an incomplete task to them
+    const task = parseLine(taskLine, normalizedSourcePath, options.line);
+    if (task && task.status !== "done" && task.status !== "cancelled" && project.status === "done") {
+      const { setProjectField: setField } = await import("./projects.js");
+      await setField(config, project.name, "status", "active");
+      reopened = true;
+    }
+  } else {
+    const targetDate = options.date!;
+    const dailyNotePath = getDailyNotePath(config, targetDate);
+    destFullPath = path.join(config.vaultPath, dailyNotePath);
+    destHeading = "## Journal";
+    destination = `daily note for ${targetDate}`;
+
+    // Ensure the daily notes directory exists
+    await fs.mkdir(path.dirname(destFullPath), { recursive: true });
+  }
+
+  // ── Write destination first (task briefly in both places) ─
+  let destContent: string;
+  try {
+    destContent = await fs.readFile(destFullPath, "utf-8");
+  } catch {
+    // Daily note doesn't exist yet — create from template
+    if (options.date) {
+      destContent = createDailyNoteTemplate(options.date);
+    } else {
+      throw new Error(`Destination file not found: ${destFullPath}`);
+    }
+  }
+
+  // Strip self-referential wiki links if moving to a project
+  let cleanedTaskLine = taskLine;
+  if (options.project) {
+    const project = await findProject(config, options.project);
+    if (project) {
+      cleanedTaskLine = stripSelfLinks(taskLine, project.name);
+    }
+  }
+
+  destContent = insertContentUnderHeading(destContent, cleanedTaskLine, destHeading);
+  await fs.writeFile(destFullPath, destContent, "utf-8");
+
+  // ── Remove from source ────────────────────────────────────
+  sourceLines.splice(lineIdx, 1);
+  await fs.writeFile(sourceFullPath, sourceLines.join("\n"), "utf-8");
+
+  return { description, taskLine: cleanedTaskLine, destination, reopened };
+}
+
 // ─── Internal helpers ────────────────────────────────────────
 
 /**
@@ -518,17 +797,28 @@ async function addTaskToDailyNote(
 /**
  * Add a formatted task line to a project file under "## Tasks".
  * Falls back to appending at end if no "## Tasks" heading exists.
+ *
+ * If the project has `status: done`, it is automatically reopened
+ * (set to "active") before adding the task.
  */
 async function addTaskToProject(
   config: SiftConfig,
   projectName: string,
   taskLine: string,
-): Promise<string> {
+): Promise<AddTaskResult> {
   const project = await findProject(config, projectName);
   if (!project) {
     throw new Error(
       `Project "${projectName}" not found. Use "sift projects" to see available projects.`,
     );
+  }
+
+  // Auto-reopen done projects when adding a new task
+  let reopened = false;
+  if (project.status === "done") {
+    const { setProjectField } = await import("./projects.js");
+    await setProjectField(config, project.name, "status", "active");
+    reopened = true;
   }
 
   const fullPath = path.join(config.vaultPath, project.filePath);
@@ -541,7 +831,7 @@ async function addTaskToProject(
   content = insertContentUnderHeading(content, cleanedTaskLine, "## Tasks", "## Changelog");
   await fs.writeFile(fullPath, content, "utf-8");
 
-  return cleanedTaskLine;
+  return { taskLine: cleanedTaskLine, reopened };
 }
 
 /**

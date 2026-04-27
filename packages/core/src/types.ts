@@ -149,6 +149,12 @@ export interface ProjectInfo {
 
   /** The parent area name, if this project references one */
   area?: string;
+
+  /** Date the project was last reviewed (YYYY-MM-DD), if present */
+  lastReviewed?: string;
+
+  /** Custom review interval in days, if present. Overrides the per-status defaults. */
+  reviewInterval?: number;
 }
 
 /**
