@@ -455,7 +455,7 @@ export const subnote = tool({
 
 export const project_set = tool({
   description:
-    "Update frontmatter fields on a project or area (status, timeframe, tags). Use this to change a project's or area's status (active, planning, someday, done), timeframe, or tags.",
+    "Update frontmatter fields on a project or area (status, timeframe, tags, reviewInterval). Use this to change a project's or area's status (active, planning, someday, done), timeframe, tags, or review cadence.",
   args: {
     name: tool.schema.string().describe("The project name"),
     status: tool.schema
@@ -470,12 +470,17 @@ export const project_set = tool({
       .array(tool.schema.string())
       .optional()
       .describe("New tag list (replaces existing tags)"),
+    reviewInterval: tool.schema
+      .number()
+      .optional()
+      .describe("Review interval in days. Overrides the per-status default (active: 7, planning: 14, areas: 14, someday: 30)."),
   },
   async execute(args) {
     const cliArgs = ["project", "set"];
     if (args.status) cliArgs.push("--status", args.status);
     if (args.timeframe) cliArgs.push("--timeframe", args.timeframe);
     if (args.tags && args.tags.length > 0) cliArgs.push("--tags", ...args.tags);
+    if (args.reviewInterval) cliArgs.push("--review-interval", String(args.reviewInterval));
     cliArgs.push("--", args.name);
     return runSift(cliArgs);
   },

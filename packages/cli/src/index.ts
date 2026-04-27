@@ -556,25 +556,36 @@ projectCmd
   .option("--status <status>", "Set project status (active, planning, someday, done)")
   .option("--timeframe <timeframe>", "Set project timeframe")
   .option("--tags <tags...>", "Set project tags (space-separated, replaces existing tags)")
+  .option("--review-interval <days>", "Set review interval in days (overrides the per-status default)")
   .action(async (nameParts: string[], opts) => {
     const config = await resolveConfig();
     const name = nameParts.join(" ");
 
-    const hasChanges = opts.status || opts.timeframe || opts.tags;
+    const hasChanges = opts.status || opts.timeframe || opts.tags || opts.reviewInterval;
     if (!hasChanges) {
       console.error(chalk.red("Error: ") + "Specify at least one field to set (e.g. --status active)");
       process.exit(1);
+    }
+
+    if (opts.reviewInterval) {
+      const parsed = parseInt(opts.reviewInterval, 10);
+      if (isNaN(parsed) || parsed < 1) {
+        console.error(chalk.red("Invalid --review-interval: ") + opts.reviewInterval + chalk.dim(" (must be a positive integer)"));
+        process.exit(1);
+      }
     }
 
     try {
       if (opts.status) await setProjectField(config, name, "status", opts.status);
       if (opts.timeframe) await setProjectField(config, name, "timeframe", opts.timeframe);
       if (opts.tags) await setProjectField(config, name, "tags", opts.tags as string[]);
+      if (opts.reviewInterval) await setProjectField(config, name, "reviewInterval", opts.reviewInterval);
 
       console.log(chalk.green("✓") + ` Updated project "${name}"`);
       if (opts.status) console.log(chalk.dim("  status: ") + opts.status);
       if (opts.timeframe) console.log(chalk.dim("  timeframe: ") + opts.timeframe);
       if (opts.tags) console.log(chalk.dim("  tags: ") + (opts.tags as string[]).map((t: string) => `#${t}`).join(" "));
+      if (opts.reviewInterval) console.log(chalk.dim("  reviewInterval: ") + opts.reviewInterval + " days");
     } catch (err: any) {
       console.error(chalk.red("Error: ") + err.message);
       process.exit(1);

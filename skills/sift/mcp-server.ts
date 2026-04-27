@@ -446,7 +446,7 @@ const tools: Tool[] = [
   {
     name: "sift_project_set",
     description:
-      "Update frontmatter fields on a project or area (status, timeframe, tags). Use this to change a project's or area's status (active, planning, someday, done), timeframe, or tags.",
+      "Update frontmatter fields on a project or area (status, timeframe, tags, reviewInterval). Use this to change a project's or area's status (active, planning, someday, done), timeframe, tags, or review cadence.",
     inputSchema: {
       type: "object",
       properties: {
@@ -467,6 +467,10 @@ const tools: Tool[] = [
           type: "array",
           items: { type: "string" },
           description: "New tag list (replaces existing tags)",
+        },
+        reviewInterval: {
+          type: "number",
+          description: "Review interval in days. Overrides the per-status default (active: 7, planning: 14, areas: 14, someday: 30).",
         },
       },
       required: ["name"],
@@ -936,6 +940,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (args?.tags && Array.isArray(args.tags) && args.tags.length > 0) {
           cliArgs.push("--tags", ...(args.tags as string[]));
         }
+        if (args?.reviewInterval) cliArgs.push("--review-interval", String(args.reviewInterval));
         cliArgs.push("--", args?.name as string);
         const result = runSift(cliArgs);
         return {
