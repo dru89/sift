@@ -107,29 +107,25 @@ On Windows, use forward slashes or escaped backslashes in the path (e.g., `C:/Us
 
 **Step 6: OpenCode native tools (OpenCode users only)**
 
-OpenCode supports native TypeScript tools, which are faster than the MCP server (no subprocess overhead). The skill installer doesn't know about OpenCode's tools directory, so you need to link the files manually.
+OpenCode supports native TypeScript tools, which are faster than the MCP server (no subprocess overhead). The skill installer doesn't know about OpenCode's tools directory, so you need to copy the tool files manually.
+
+Note: symlinks don't work here — Node resolves imports relative to the real file path, and `@opencode-ai/plugin` is only installed in OpenCode's `node_modules`, not in the skill install directory.
 
 **macOS / Linux:**
 ```bash
-ln -s ~/.agents/skills/sift/tools/sift.ts ~/.config/opencode/tools/sift.ts
-ln -s ~/.agents/skills/sift/tools/vault.ts ~/.config/opencode/tools/vault.ts
+cp ~/.agents/skills/sift/tools/sift.ts ~/.config/opencode/tools/sift.ts
+cp ~/.agents/skills/sift/tools/vault.ts ~/.config/opencode/tools/vault.ts
 ```
 
-**Windows (PowerShell, run as Administrator):**
-```powershell
-New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.config\opencode\tools\sift.ts" -Target "$env:USERPROFILE\.agents\skills\sift\tools\sift.ts"
-New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.config\opencode\tools\vault.ts" -Target "$env:USERPROFILE\.agents\skills\sift\tools\vault.ts"
-```
-
-If symlinks aren't an option on Windows (requires admin or Developer Mode), copy the files instead and re-copy after running `npx skills add`:
+**Windows (PowerShell):**
 ```powershell
 Copy-Item "$env:USERPROFILE\.agents\skills\sift\tools\sift.ts" "$env:USERPROFILE\.config\opencode\tools\sift.ts"
 Copy-Item "$env:USERPROFILE\.agents\skills\sift\tools\vault.ts" "$env:USERPROFILE\.config\opencode\tools\vault.ts"
 ```
 
-This is a one-time setup. With symlinks, `npx skills add` updates the source files and OpenCode picks up changes automatically.
+Re-run these commands after `npx skills add` to pick up changes.
 
-**During development:** After changing skill files, re-run `npx skills add . -g -y` from the repo root. The installer copies files (not symlinks) to `~/.agents/skills/sift/`, so you need to re-run after changes. The OpenCode symlinks point to the installed copy, so they'll pick up the updated files.
+**During development:** After changing skill files, re-run `npx skills add . -g -y` from the repo root, then copy the tool files again. The installer copies files to `~/.agents/skills/sift/`, but OpenCode reads from its own tools directory.
 
 Both the MCP server and OpenCode tools resolve the `sift` CLI dynamically (from PATH or `SIFT_CLI_PATH` env var) rather than hardcoding a path.
 
