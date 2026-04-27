@@ -203,6 +203,37 @@ Use `sift_review` to generate a review summary for any time period. It defaults 
 - User asks "review March" -- use `since` and `until` for the month range
 - User wants to reflect on recent progress across projects
 
+### Weekly reviews
+
+Weekly notes live in `Weekly Notes/` and are named `YYYY-[W]WW` (e.g., `2026-W17`). Each weekly note has two layers:
+
+1. **Narrative summary** (`## Summary`) -- an LLM-written overview of the week, split into `### Work` and `### Personal & Tooling` subsections. This is the "so what" layer: what moved forward, what decisions were made, what's coming next. Written in prose, not bullets.
+2. **Dataview/Tasks queries** -- live-rendered sections (Work Log, Completed Tasks, Project Activity, Tasks Created) that pull raw data from daily notes, project changelogs, and task metadata. These are the backing evidence for the narrative.
+
+**How to write the narrative summary:**
+
+1. Run `sift_review` with the appropriate Mon-Sun date range for the week.
+2. Read back any work log entries from the daily notes in that range for additional color.
+3. Write the `### Work` section covering Disney deliverables: what progressed, key decisions or findings, who was involved (wiki-linked), and what's coming next. Include links to relevant projects, docs, and people where they add context, but don't over-link.
+4. Write the `### Personal & Tooling` section covering side projects, open source, agent skills, and tool development. Same approach: what shipped or progressed, with selective wiki links.
+5. Keep it concise. Each section should be 1-3 short paragraphs. The Dataview queries below have the exhaustive lists; the summary shouldn't duplicate them.
+
+**Writing style for the narrative:**
+- Write in third person using the user's first name (e.g., "Drew met with...") or use project/team as the subject. This reads better as a record than "I did X."
+- Use wiki links for people (`[[Diana Jerman]]`), projects (`[[Evaluate WeaponX pipeline for Sports and News]]`), and areas (`[[Incident Management]]`) when they add navigability. Skip links for things mentioned in passing or already linked nearby.
+- Be specific about outcomes, not just activities. "Confirmed SWID support is feasible but insufficient to unblock N&E" is better than "discussed SWID support."
+- Don't editorialize or inflate. State what happened and what it means for next steps.
+
+**Creating the weekly note file:**
+
+When Periodic Notes creates the note through Obsidian, Templater resolves the date expressions in the template automatically. When creating a weekly note from an agent session, resolve the Templater expressions manually:
+- `week-start` frontmatter: the Monday of that week (YYYY-MM-DD)
+- `week-end` frontmatter: the Sunday of that week (YYYY-MM-DD)
+- Tasks query date bounds: `done after` = day before Monday, `done before` = day after Sunday
+- Prev/next links: `[[YYYY-W(WW-1)]]` and `[[YYYY-W(WW+1)]]`
+
+Write the file to `Weekly Notes/YYYY-[W]WW.md`. The narrative goes under `## Summary`; all Dataview/Tasks code blocks are copied from the template with dates resolved.
+
 ### Project changelogs
 
 Project files may have a `## Changelog` section with dated summary entries. These are **not auto-generated** — they are written deliberately during periodic reviews (weekly, milestone, etc.) to summarize meaningful progress.
