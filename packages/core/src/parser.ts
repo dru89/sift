@@ -14,7 +14,6 @@ const EMOJI = {
   recurrence: "🔁",
   highest: "⏫",
   high: "🔼",
-  medium: "🔽", // Obsidian Tasks uses 🔽 for medium in some configs
   low: "🔽",
   lowest: "⏬",
 } as const;

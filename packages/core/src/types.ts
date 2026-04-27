@@ -5,11 +5,11 @@
  * - ⏫ = highest
  * - 🔼 = high
  * - 🔽 = low
- * - 🔽 = lowest (double low in some setups, but we treat 🔽 as low)
+ * - ⏬ = lowest
  *
  * Tasks without a priority marker are considered "none".
  */
-export type Priority = "highest" | "high" | "medium" | "low" | "lowest" | "none";
+export type Priority = "highest" | "high" | "low" | "lowest" | "none";
 
 /**
  * Represents the completion status of a task.
@@ -238,8 +238,8 @@ export interface ReviewSummary {
   /** Tasks created during the period that are still open (have ➕ date in range) */
   created: Task[];
 
-  /** Open tasks with no due/scheduled/start date, created before the period */
-  stale: Task[];
+  /** Tasks that need triage — no dates, or high priority with stale scheduled date */
+  needsTriage: Task[];
 
   /** Changelog entries from project files during the period */
   changelog: ChangelogEntry[];

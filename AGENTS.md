@@ -27,14 +27,111 @@ The agent integration files live in `skills/sift/`:
 
 **MCP Server (for Claude Code & Claude Desktop):**
 - `skills/sift/mcp-server.ts` -- MCP server providing sift tools
-- Tools: `sift_list`, `sift_next`, `sift_summary`, `sift_add`, `sift_find`, `sift_done`, `sift_mark`, `sift_projects`, `sift_project_create`, `sift_project_path`, `sift_project_set`, `sift_note`, `sift_subnote`, `sift_area_create`, `sift_area_path`, `sift_review`, `sift_graph`, `vault_search`, `vault_backlinks`, `vault_read`, `vault_outline`
+- Tools: `sift_list`, `sift_agenda`, `sift_next`, `sift_summary`, `sift_add`, `sift_find`, `sift_done`, `sift_mark`, `sift_projects`, `sift_project_create`, `sift_project_path`, `sift_project_set`, `sift_note`, `sift_subnote`, `sift_area_create`, `sift_area_path`, `sift_review`, `sift_graph`, `vault_search`, `vault_backlinks`, `vault_read`, `vault_outline`
+
+**OpenCode native tools:**
+- `skills/sift/tools/sift.ts` -- Native tool definitions for OpenCode (task management)
+- `skills/sift/tools/vault.ts` -- Native tool definitions for OpenCode (vault search/read)
 
 **Agent Skill (all agents):**
-- `skills/sift/SKILL.md` -- Skill definition (also used by OpenCode via `tools/sift.ts`)
-- Install via `npx skills add dru89/sift -g` (from GitHub)
-- **During development:** `npx skills add . -g -y` (from the repo root). This copies files, so re-run after changing skill files.
+- `skills/sift/SKILL.md` -- Skill definition with usage instructions
 
-Both implementations resolve the CLI dynamically (from PATH or `SIFT_CLI_PATH` env var) rather than hardcoding a path.
+### Installation
+
+**Step 1: Install the CLI**
+
+Build and link the CLI so it's available on PATH:
+
+```bash
+npm install
+npm run build
+npm link         # makes `sift` available globally
+```
+
+**Step 2: Initialize config**
+
+```bash
+sift init /path/to/your/obsidian/vault
+```
+
+**Step 3: Install the agent skill**
+
+```bash
+npx skills add dru89/sift -g       # from GitHub
+npx skills add . -g -y             # from a local clone (during development)
+```
+
+This installs the SKILL.md, MCP server, and tool files to `~/.agents/skills/sift/`. Agents that read SKILL.md from that location (Codex, Copilot, etc.) get the instructions automatically.
+
+**Step 4: Claude Code MCP server (Claude Code users only)**
+
+The skill installer does not automatically configure MCP servers. Add the sift MCP server to `~/.claude.json` manually:
+
+```json
+{
+  "mcpServers": {
+    "sift": {
+      "command": "node",
+      "args": ["<path-to-mcp-server>"]
+    }
+  }
+}
+```
+
+For `<path-to-mcp-server>`, use either:
+- The repo build: `<repo>/skills/sift/dist/mcp-server.js` (rebuild after changes with `npm run build`)
+- The installed copy: `~/.agents/skills/sift/dist/mcp-server.js` (re-run `npx skills add` after changes)
+
+**Step 5: Claude Desktop MCP server (Claude Desktop users only)**
+
+Same config format as above, but the file location depends on your OS:
+
+| OS | Config path |
+|----|-------------|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Linux | `~/.config/Claude/claude_desktop_config.json` |
+
+```json
+{
+  "mcpServers": {
+    "sift": {
+      "command": "node",
+      "args": ["<path-to-mcp-server>"]
+    }
+  }
+}
+```
+
+On Windows, use forward slashes or escaped backslashes in the path (e.g., `C:/Users/you/Developer/.../mcp-server.js`).
+
+**Step 6: OpenCode native tools (OpenCode users only)**
+
+OpenCode supports native TypeScript tools, which are faster than the MCP server (no subprocess overhead). The skill installer doesn't know about OpenCode's tools directory, so you need to link the files manually.
+
+**macOS / Linux:**
+```bash
+ln -s ~/.agents/skills/sift/tools/sift.ts ~/.config/opencode/tools/sift.ts
+ln -s ~/.agents/skills/sift/tools/vault.ts ~/.config/opencode/tools/vault.ts
+```
+
+**Windows (PowerShell, run as Administrator):**
+```powershell
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.config\opencode\tools\sift.ts" -Target "$env:USERPROFILE\.agents\skills\sift\tools\sift.ts"
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.config\opencode\tools\vault.ts" -Target "$env:USERPROFILE\.agents\skills\sift\tools\vault.ts"
+```
+
+If symlinks aren't an option on Windows (requires admin or Developer Mode), copy the files instead and re-copy after running `npx skills add`:
+```powershell
+Copy-Item "$env:USERPROFILE\.agents\skills\sift\tools\sift.ts" "$env:USERPROFILE\.config\opencode\tools\sift.ts"
+Copy-Item "$env:USERPROFILE\.agents\skills\sift\tools\vault.ts" "$env:USERPROFILE\.config\opencode\tools\vault.ts"
+```
+
+This is a one-time setup. With symlinks, `npx skills add` updates the source files and OpenCode picks up changes automatically.
+
+**During development:** After changing skill files, re-run `npx skills add . -g -y` from the repo root. The installer copies files (not symlinks) to `~/.agents/skills/sift/`, so you need to re-run after changes. The OpenCode symlinks point to the installed copy, so they'll pick up the updated files.
+
+Both the MCP server and OpenCode tools resolve the `sift` CLI dynamically (from PATH or `SIFT_CLI_PATH` env var) rather than hardcoding a path.
 
 ## Key concepts
 
@@ -86,6 +183,25 @@ A per-repo `.siftrc.json` can also include a `project` field to associate the wo
 The scanner (`packages/core/src/scanner.ts`) walks all `.md` files in the vault, skipping excluded folders and root-level ALL_CAPS files (setup/reference docs). It parses every line looking for `- [ ]` or `- [x]` patterns and extracts metadata.
 
 `TaskFilter` accepts a `filePatterns?: string[]` field for restricting which files are scanned. When `sift list --project <name>` resolves to an area, it automatically expands to include all projects that declare that area in their `area:` frontmatter — so querying an area returns tasks from the area file and all its linked projects.
+
+### Urgency scoring
+
+Tasks are ranked by an additive urgency score computed in `computeUrgency()` (`packages/core/src/scanner.ts`). The score blends due date proximity, priority, scheduled date, start date, and in-progress status. See [URGENCY.md](URGENCY.md) for the full model, design rationale, and tuning guidance.
+
+Key points:
+- Due dates are the strongest signal (0–12 points). A no-priority task due today outranks a highest-priority task with no due date.
+- Scheduled dates in the past **decay** over 4 weeks. A stale scheduled date eventually contributes nothing.
+- Overdue due dates do **not** decay — they stay visible until acted on.
+- `sortByUrgency()` sorts by this score. Both `getNextTasks()` and `getAgendaTasks()` use it.
+
+### Agenda vs Next
+
+Sift has two "what should I work on?" views:
+
+- **`sift agenda`** — "What needs my attention today?" Pre-filters to temporally relevant tasks (due/overdue, scheduled today or past, in-progress, start date is today), then sorts by urgency score.
+- **`sift next`** — "What's most important overall?" No date pre-filter; scores all actionable tasks and returns the top N.
+
+Both use the same scoring function. The difference is what they filter before scoring.
 
 ### Task writing
 
@@ -159,7 +275,7 @@ sift summary
 Pure library, no CLI or UI. Key exports:
 
 - **Parser**: `parseLine()`, `parseContent()`, `formatTask()`
-- **Scanner**: `scanTasks()`, `scanFile()`, `getNextTasks()`, `getOverdueTasks()`, `getDueToday()`, `sortByUrgency()`, `isNotYetStartable()`, `getReviewSummary()`, `scanChangelog()`
+- **Scanner**: `scanTasks()`, `scanFile()`, `getNextTasks()`, `getAgendaTasks()`, `getOverdueTasks()`, `getDueToday()`, `sortByUrgency()`, `computeUrgency()`, `isNotYetStartable()`, `getReviewSummary()`, `scanChangelog()`
 - **Writer**: `addTask()`, `addTaskToFile()`, `addNote()`, `completeTask()`, `findTasks()`, `createSubnote()`, `markTaskStatus()`, `insertContentUnderHeading()`
 - **Projects**: `listProjects()`, `findProject()`, `createProject()`, `createArea()`, `setProjectField()`
 - **Config**: `resolveConfig()`, `writeConfig()`
@@ -167,7 +283,7 @@ Pure library, no CLI or UI. Key exports:
 
 ### @sift/cli (`packages/cli/`)
 
-Commands: `list`, `next`, `today`, `overdue`, `add`, `done`, `find`, `note`, `subnote`, `mark`, `review`, `projects`, `project create`, `project path`, `project set`, `area create`, `area path`, `summary`, `init`
+Commands: `list`, `next`, `agenda`, `today`, `overdue`, `add`, `done`, `find`, `note`, `subnote`, `mark`, `review`, `projects`, `project create`, `project path`, `project set`, `area create`, `area path`, `summary`, `init`
 
 Uses commander.js for arg parsing and chalk for terminal output.
 

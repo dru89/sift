@@ -11,11 +11,131 @@ import { type Task, type TaskFilter, type SiftConfig, type Priority, type Change
 const PRIORITY_ORDER: Record<Priority, number> = {
   highest: 0,
   high: 1,
-  medium: 2,
-  none: 3,
-  low: 4,
-  lowest: 5,
+  none: 2,
+  low: 3,
+  lowest: 4,
 };
+
+// ─── Urgency Scoring ─────────────────────────────────────────
+//
+// Urgency is an additive numeric score computed from four independent
+// components: due date, priority, scheduled date, and start date, plus
+// a small boost for in-progress tasks. Higher score = more urgent.
+//
+// The model is inspired by Obsidian Tasks' urgency scoring (itself
+// derived from Taskwarrior) but diverges in one key way: scheduled
+// dates in the past decay over ~4 weeks instead of giving a permanent
+// boost. This prevents stale tasks with long-past scheduled dates
+// from permanently occupying the top of "next" views.
+//
+// See URGENCY.md for the design rationale.
+//
+
+/**
+ * Urgency score contribution from priority.
+ *
+ * These values are calibrated so that priority alone doesn't dominate
+ * over a near-term due date. A highest-priority task with no due date
+ * (score 9.0) is outranked by a no-priority task due today (8.8 + 2.0).
+ */
+const PRIORITY_SCORE: Record<Priority, number> = {
+  highest: 9.0,
+  high: 6.0,
+  none: 2.0,
+  low: 0.0,
+  lowest: -2.0,
+};
+
+/**
+ * Compute the due-date component of urgency.
+ *
+ * Uses a linear ramp over a 14-day window around today:
+ * - 7+ days overdue: 12.0 (capped — stays high until you act or the review flags it)
+ * - Due today: 8.8
+ * - 14+ days out: 2.4 (floor)
+ * - No due date: 0.0
+ *
+ * The curve is ~0.46 points per day, matching Obsidian Tasks.
+ */
+function dueDateScore(dueDate: string | null, today: string): number {
+  if (!dueDate) return 0.0;
+  const daysUntil = daysBetween(today, dueDate);
+  if (daysUntil < -7) return 12.0;   // overdue > 7 days, capped
+  if (daysUntil > 14) return 2.4;    // far out, floor
+  // Linear interpolation: -7 days → 12.0, +14 days → 2.4
+  return 12.0 - ((daysUntil + 7) * (12.0 - 2.4)) / 21;
+}
+
+/**
+ * Compute the scheduled-date component of urgency.
+ *
+ * - Scheduled for today: 5.0
+ * - Scheduled in the past: decays from 5.0 to 0.0 over 4 weeks.
+ *   A task scheduled 8 weeks ago contributes nothing — your behavior
+ *   (ignoring it) is a signal that the scheduled date is stale.
+ * - Scheduled in the future or no date: 0.0
+ */
+function scheduledDateScore(scheduledDate: string | null, today: string): number {
+  if (!scheduledDate) return 0.0;
+  const daysAgo = daysBetween(scheduledDate, today); // positive = past
+  if (daysAgo < 0) return 0.0;   // future scheduled date
+  if (daysAgo === 0) return 5.0;  // today
+  // Decay: 5.0 at day 0, 0.0 at day 28 (4 weeks)
+  return Math.max(5.0 - (daysAgo * 5.0) / 28, 0.0);
+}
+
+/**
+ * Compute the start-date component of urgency.
+ *
+ * Start date is purely a penalty for future-start tasks.
+ * - Future start: -3.0 (pushes task down)
+ * - Today, past, or no date: 0.0
+ */
+function startDateScore(startDate: string | null, today: string): number {
+  if (!startDate) return 0.0;
+  if (startDate > today) return -3.0;
+  return 0.0;
+}
+
+/**
+ * Compute the urgency score for a single task.
+ *
+ * The score is the sum of independent components:
+ * - Due date: 0.0 to 12.0 (strongest signal — deadlines dominate)
+ * - Priority: -2.0 to 9.0 (sets the baseline importance)
+ * - Scheduled date: 0.0 to 5.0 (decays if past, 0.0 if future/none)
+ * - Start date: -3.0 or 0.0 (penalty for future-start only)
+ * - In-progress: +3.0 if status is in_progress
+ *
+ * @returns A numeric score. Higher = more urgent.
+ */
+export function computeUrgency(task: Task, today?: string): number {
+  const t = today ?? localToday();
+  let score = 0;
+
+  score += dueDateScore(task.due, t);
+  score += PRIORITY_SCORE[task.priority];
+  score += scheduledDateScore(task.scheduled, t);
+  score += startDateScore(task.start, t);
+
+  if (task.status === "in_progress") {
+    score += 3.0;
+  }
+
+  return score;
+}
+
+/**
+ * Compute the number of days between two YYYY-MM-DD date strings.
+ * Returns positive if `to` is after `from`, negative if before.
+ */
+function daysBetween(from: string, to: string): number {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  const fromDate = new Date(fy, fm - 1, fd);
+  const toDate = new Date(ty, tm - 1, td);
+  return Math.round((toDate.getTime() - fromDate.getTime()) / 86400000);
+}
 
 /**
  * Scan the entire vault for tasks, optionally filtering them.
@@ -162,57 +282,51 @@ export function isNotYetStartable(task: Task, today?: string): boolean {
 }
 
 /**
- * Sort tasks by urgency/importance.
- * Sort order:
- * 1. Startability (tasks ready to start before future-start tasks)
- * 2. Priority (highest first)
- * 3. Due date (soonest first, tasks with due dates before tasks without)
- * 4. Scheduled date (soonest first)
- * 5. Start date (soonest first, for future-start tasks)
- * 6. Alphabetical by description
+ * Sort tasks by urgency score (descending).
+ *
+ * Uses the additive urgency scoring model — each task gets a numeric
+ * score based on due date proximity, priority, scheduled date, start
+ * date, and in-progress status. Tasks with higher scores come first.
+ *
+ * Ties are broken by: due date (soonest first) → priority → alphabetical.
  */
 export function sortByUrgency(tasks: Task[]): Task[] {
   const today = localToday();
+  const scoreCache = new Map<Task, number>();
+  const getScore = (t: Task) => {
+    let s = scoreCache.get(t);
+    if (s === undefined) {
+      s = computeUrgency(t, today);
+      scoreCache.set(t, s);
+    }
+    return s;
+  };
+
   return [...tasks].sort((a, b) => {
-    // Future-start tasks sink below ready tasks
-    const futureA = isNotYetStartable(a, today) ? 1 : 0;
-    const futureB = isNotYetStartable(b, today) ? 1 : 0;
-    if (futureA !== futureB) return futureA - futureB;
+    // Primary: urgency score (higher first)
+    const scoreDiff = getScore(b) - getScore(a);
+    if (Math.abs(scoreDiff) > 0.001) return scoreDiff;
 
-    // Priority first
-    const prioA = PRIORITY_ORDER[a.priority];
-    const prioB = PRIORITY_ORDER[b.priority];
-    if (prioA !== prioB) return prioA - prioB;
-
-    // Due date (null = later)
+    // Tiebreaker 1: due date (soonest first, null last)
     if (a.due !== b.due) {
       if (a.due === null) return 1;
       if (b.due === null) return -1;
       return a.due.localeCompare(b.due);
     }
 
-    // Scheduled date
-    if (a.scheduled !== b.scheduled) {
-      if (a.scheduled === null) return 1;
-      if (b.scheduled === null) return -1;
-      return a.scheduled.localeCompare(b.scheduled);
-    }
+    // Tiebreaker 2: priority
+    const prioA = PRIORITY_ORDER[a.priority];
+    const prioB = PRIORITY_ORDER[b.priority];
+    if (prioA !== prioB) return prioA - prioB;
 
-    // Start date (for future-start tasks, soonest first)
-    if (a.start !== b.start) {
-      if (a.start === null) return 1;
-      if (b.start === null) return -1;
-      return a.start.localeCompare(b.start);
-    }
-
-    // Alphabetical fallback
+    // Tiebreaker 3: alphabetical
     return a.description.localeCompare(b.description);
   });
 }
 
 /**
  * Get tasks that are most important right now.
- * Returns open tasks sorted by urgency, limited to `count`.
+ * Returns actionable tasks sorted by urgency score, limited to `count`.
  */
 export async function getNextTasks(
   config: SiftConfig,
@@ -221,6 +335,40 @@ export async function getNextTasks(
   const tasks = await scanTasks(config, { status: ACTIONABLE_STATUSES });
   const sorted = sortByUrgency(tasks);
   return sorted.slice(0, count);
+}
+
+/**
+ * Get tasks that are relevant to today's agenda.
+ *
+ * Returns actionable tasks matching any of these criteria:
+ * - Due today or overdue (due <= today)
+ * - Scheduled for today or a missed scheduled date (scheduled <= today)
+ * - Start date is today (just became available)
+ * - Status is in_progress (actively being worked on)
+ *
+ * Excludes tasks with a future start date (can't work on them yet).
+ * Results are sorted by urgency score.
+ */
+export async function getAgendaTasks(
+  config: SiftConfig,
+): Promise<Task[]> {
+  const today = localToday();
+  const tasks = await scanTasks(config, { status: ACTIONABLE_STATUSES });
+
+  const agenda = tasks.filter((t) => {
+    // Exclude future-start tasks
+    if (isNotYetStartable(t, today)) return false;
+
+    // Include if any temporal condition matches
+    if (t.due !== null && t.due <= today) return true;          // due today or overdue
+    if (t.scheduled !== null && t.scheduled <= today) return true; // scheduled today or past
+    if (t.start !== null && t.start === today) return true;      // just became available
+    if (t.status === "in_progress") return true;                 // actively working on it
+
+    return false;
+  });
+
+  return sortByUrgency(agenda);
 }
 
 /**
@@ -434,17 +582,33 @@ export async function getReviewSummary(
     ),
   );
 
-  // Stale tasks: actionable, no due/scheduled/start date, created before the period.
-  // Tasks with a start date are intentionally deferred, not stale.
-  const stale = sortByUrgency(
-    allTasks.filter(
-      (t) =>
-        ACTIONABLE_STATUSES.includes(t.status) &&
+  // Needs triage: actionable tasks where stated priority doesn't match
+  // observed behavior, or tasks with no dates that may have been forgotten.
+  // This replaces the narrower "stale" concept — it catches:
+  // 1. No dates at all (may need scheduling or deprioritizing)
+  // 2. High/highest priority with a scheduled date 4+ weeks in the past
+  //    (stated priority doesn't match behavior)
+  const TRIAGE_STALE_WEEKS = 4;
+  const triageCutoff = addDays(today, -(TRIAGE_STALE_WEEKS * 7));
+  const needsTriage = sortByUrgency(
+    allTasks.filter((t) => {
+      if (!ACTIONABLE_STATUSES.includes(t.status)) return false;
+      // Created during this review period — too new to triage
+      if (t.created !== null && t.created >= effectiveSince) return false;
+
+      // Case 1: no dates at all
+      if (t.due === null && t.scheduled === null && t.start === null) return true;
+
+      // Case 2: high priority + stale scheduled date, no due date
+      if (
+        (t.priority === "highest" || t.priority === "high") &&
         t.due === null &&
-        t.scheduled === null &&
-        t.start === null &&
-        (t.created === null || t.created < effectiveSince),
-    ),
+        t.scheduled !== null &&
+        t.scheduled < triageCutoff
+      ) return true;
+
+      return false;
+    }),
   );
 
   // Deferred tasks: moved or on_hold, created during the period
@@ -481,7 +645,7 @@ export async function getReviewSummary(
     until: effectiveUntil,
     completed,
     created,
-    stale,
+    needsTriage,
     changelog,
     newFiles,
     deferred,

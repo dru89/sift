@@ -13,8 +13,9 @@ The following custom tools are available for interacting with the user's tasks a
 
 **Task management:**
 - **`sift_list`** - List open tasks, optionally filtered by search text, priority, due/scheduled/start date, or project/area. When `project` is an area name, automatically includes tasks from all projects linked to that area. Use `groupByProject: true` to bucket results by project.
-- **`sift_next`** - Get the most important tasks to work on right now (sorted by priority + urgency; future-start tasks are deprioritized)
-- **`sift_summary`** - Quick overview: open count, overdue, due today, high priority, not yet startable, and up next
+- **`sift_agenda`** - Show tasks relevant to today: due today, overdue, scheduled for today or past, in-progress, and newly available. Use when the user asks "what's on my plate today?"
+- **`sift_next`** - Get the most important tasks overall, sorted by urgency score (blends due date proximity, priority, scheduled date, and in-progress status)
+- **`sift_summary`** - Quick overview: today's agenda, counts, and what's up next
 - **`sift_add`** - Add a new task to today's daily note, or to a specific project/area
 - **`sift_find`** - Search for tasks without modifying them (use before `sift_done` or `sift_mark`; pass `all: true` to include completed/cancelled)
 - **`sift_done`** - Mark a task as complete (requires file+line from `sift_find`; confirm with user first; pass `description` for safety)
@@ -31,7 +32,7 @@ The following custom tools are available for interacting with the user's tasks a
 **Notes and content:**
 - **`sift_note`** - Add a freeform note to a daily note, project, or area
 - **`sift_subnote`** - Create a separate note file linked to a project or area. Use for long-form content
-- **`sift_review`** - Generate a review summary (completed, created, stale, changelog, upcoming)
+- **`sift_review`** - Generate a review summary (completed, created, needs triage, changelog, upcoming)
 
 **Graph and context (requires Obsidian to be running):**
 - **`sift_graph`** - Return the structural context for an area or project: child projects, subnotes, and other linked files (emails, weblinks). Excludes daily/weekly notes. Use to orient before working on an area.
@@ -94,8 +95,9 @@ Tasks use the Obsidian Tasks emoji format:
 - Highlight overdue tasks and high-priority items
 - When adding tasks, confirm what was added (description, priority, dates, and which file it was added to)
 - If the user mentions wanting to do something, offer to add it as a task
-- Use `sift_next` when the user wants to know what to focus on
-- Use `sift_summary` for a quick overview
+- Use `sift_agenda` when the user asks about today — "what's on my plate?", "what's my agenda?", "what should I focus on today?"
+- Use `sift_next` when the user asks about priorities overall — "what's most important?", "what should I work on next?"
+- Use `sift_summary` for a quick overview (includes both agenda and next)
 - When the user says something like "I need to remember to X" or "add a task to Y", use `sift_add`
 
 ## Writing task descriptions

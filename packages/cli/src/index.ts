@@ -8,6 +8,7 @@ import {
   writeConfig,
   scanTasks,
   getNextTasks,
+  getAgendaTasks,
   getOverdueTasks,
   getDueToday,
   getReviewSummary,
@@ -26,6 +27,7 @@ import {
   localToday,
   addDays,
   previousDayOfWeek,
+  ACTIONABLE_STATUSES,
   type Priority,
   type TaskStatus,
   type SiftConfig,
@@ -82,7 +84,7 @@ program
     }
 
     const tasks = await scanTasks(config, {
-      status: opts.all ? undefined : "open",
+      status: opts.all ? undefined : ACTIONABLE_STATUSES,
       search: opts.search,
       minPriority: opts.priority as Priority | undefined,
       dueBefore: opts.dueBefore,
@@ -166,6 +168,29 @@ program
       vaultPath: opts.absolute ? config.vaultPath : undefined,
     };
     console.log(formatTaskList(tasks, "Due Today", fmtOpts));
+  });
+
+// ─── sift agenda ─────────────────────────────────────────────
+program
+  .command("agenda")
+  .description("Show tasks relevant to today: due, scheduled, in-progress, and overdue")
+  .option("--show-file", "Show file path for each task")
+  .option("--absolute", "Show absolute file paths instead of vault-relative")
+  .action(async (opts) => {
+    const config = await resolveConfig();
+    const tasks = await getAgendaTasks(config);
+
+    const fmtOpts: FormatTaskOptions = {
+      showFile: opts.showFile,
+      vaultPath: opts.absolute ? config.vaultPath : undefined,
+    };
+
+    if (tasks.length === 0) {
+      console.log(chalk.bold("📋 Today's Agenda"));
+      console.log(chalk.dim("  Nothing on the agenda today."));
+    } else {
+      console.log(formatTaskList(tasks, "📋 Today's Agenda", fmtOpts));
+    }
   });
 
 // ─── sift add ────────────────────────────────────────────────
@@ -668,7 +693,7 @@ program
 // ─── sift review ─────────────────────────────────────────────
 program
   .command("review")
-  .description("Review summary: completed, created, stale, changelog, and upcoming")
+  .description("Review summary: completed, created, needs triage, changelog, and upcoming")
   .option("--since <date>", "Start of review period (YYYY-MM-DD, default: last Friday)")
   .option("--until <date>", "End of review period (YYYY-MM-DD, default: today)")
   .option("--days <number>", "Review the last N days (alternative to --since)")
@@ -766,17 +791,21 @@ program
       console.log();
     }
 
-    // Stale
-    if (review.stale.length > 0) {
-      console.log(chalk.bold.yellow(`⚠️  Stale — no due date, no schedule, no start date (${review.stale.length})`));
-      for (const task of review.stale.slice(0, 10)) {
+    // Needs triage — tasks that may need reprioritizing or scheduling
+    if (review.needsTriage.length > 0) {
+      console.log(chalk.bold.yellow(`⚠️  Needs triage — may need reprioritizing or scheduling (${review.needsTriage.length})`));
+      for (const task of review.needsTriage.slice(0, 10)) {
         const parts = ["  " + chalk.dim("○"), task.description];
+        if (task.priority === "highest" || task.priority === "high") {
+          parts.push(chalk.yellow(`${task.priority} priority`));
+        }
+        if (task.scheduled) parts.push(chalk.dim(`scheduled ${task.scheduled}`));
         if (task.created) parts.push(chalk.dim(`created ${task.created}`));
         parts.push(chalk.dim(`[${resolvePath(task.filePath)}]`));
         console.log(parts.join("  "));
       }
-      if (review.stale.length > 10) {
-        console.log(chalk.dim(`  ... and ${review.stale.length - 10} more`));
+      if (review.needsTriage.length > 10) {
+        console.log(chalk.dim(`  ... and ${review.needsTriage.length - 10} more`));
       }
       console.log();
     }
@@ -828,15 +857,10 @@ program
   .description("Quick overview of your task status")
   .action(async () => {
     const config = await resolveConfig();
-    const today = localToday();
 
     const allTasks = await scanTasks(config);
-    const actionableTasks = allTasks.filter((t) => t.status === "open" || t.status === "in_progress");
-    const inProgressTasks = allTasks.filter((t) => t.status === "in_progress");
-    const openTasks = allTasks.filter((t) => t.status === "open");
-    const overdue = actionableTasks.filter((t) => t.due !== null && t.due < today);
-    const dueToday = actionableTasks.filter((t) => t.due === today);
-    const highPriority = actionableTasks.filter((t) => t.priority === "highest" || t.priority === "high");
+    const agenda = await getAgendaTasks(config);
+    const next = await getNextTasks(config, 5);
 
     console.log(chalk.bold("📋 Sift Summary"));
     console.log(chalk.dim(`  Vault: ${config.vaultPath}`));
@@ -844,27 +868,13 @@ program
     console.log(formatSummary(allTasks));
     console.log();
 
-    if (overdue.length > 0) {
-      console.log(formatTaskList(sortByUrgency(overdue), "🔴 Overdue"));
+    // Agenda: what's relevant today
+    if (agenda.length > 0) {
+      console.log(formatTaskList(agenda, "📋 Today's Agenda"));
       console.log();
     }
 
-    if (dueToday.length > 0) {
-      console.log(formatTaskList(sortByUrgency(dueToday), "📅 Due Today"));
-      console.log();
-    }
-
-    if (inProgressTasks.length > 0) {
-      console.log(formatTaskList(sortByUrgency(inProgressTasks), "◐ In Progress"));
-      console.log();
-    }
-
-    if (highPriority.length > 0) {
-      console.log(formatTaskList(sortByUrgency(highPriority).slice(0, 5), "⏫ High Priority"));
-      console.log();
-    }
-
-    const next = sortByUrgency(openTasks).slice(0, 5);
+    // Up next: most important overall
     console.log(formatTaskList(next, "👉 Up Next"));
 
     // Projects section

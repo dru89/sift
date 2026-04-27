@@ -105,10 +105,19 @@ export const next = tool({
 
 export const summary = tool({
   description:
-    "Quick overview of task status: open count, overdue, due today, high priority, not yet startable, and what's up next.",
+    "Quick overview of task status: today's agenda, counts, and what's up next.",
   args: {},
   async execute() {
     return runSift(["summary"]);
+  },
+});
+
+export const agenda = tool({
+  description:
+    "Show tasks relevant to today: due today, overdue, scheduled for today or past, in-progress, and newly available. Use this when the user asks 'what's on my plate today?' or 'what should I focus on today?'",
+  args: {},
+  async execute() {
+    return runSift(["agenda", "--show-file", "--absolute"]);
   },
 });
 
@@ -507,7 +516,7 @@ export const mark = tool({
 
 export const review = tool({
   description:
-    "Generate a review summary for a time period. Shows tasks completed, tasks created (still open), stale tasks (no dates), project changelog entries, and upcoming tasks. Defaults to since last Friday.",
+    "Generate a review summary for a time period. Shows tasks completed, tasks created (still open), tasks needing triage (no dates or stale high-priority), project changelog entries, and upcoming tasks. Defaults to since last Friday.",
   args: {
     since: tool.schema
       .string()

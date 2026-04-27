@@ -8,7 +8,6 @@ import { localToday, isNotYetStartable, type Task, type Priority } from "@sift/c
 const PRIORITY_DISPLAY: Record<Priority, { label: string; color: (s: string) => string }> = {
   highest: { label: "⏫", color: chalk.red },
   high: { label: "🔼", color: chalk.yellow },
-  medium: { label: "🔸", color: chalk.blue },
   none: { label: " ", color: chalk.white },
   low: { label: "🔽", color: chalk.gray },
   lowest: { label: "⏬", color: chalk.dim },

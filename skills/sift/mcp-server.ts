@@ -143,7 +143,16 @@ const tools: Tool[] = [
   {
     name: "sift_summary",
     description:
-      "Quick overview of task status: open count, overdue, due today, high priority, and what's up next.",
+      "Quick overview of task status: today's agenda, counts, and what's up next.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "sift_agenda",
+    description:
+      "Show tasks relevant to today: due today, overdue, scheduled for today or past, in-progress, and newly available. Use this when the user asks 'what's on my plate today?' or 'what should I focus on today?'",
     inputSchema: {
       type: "object",
       properties: {},
@@ -497,7 +506,7 @@ const tools: Tool[] = [
   {
     name: "sift_review",
     description:
-      "Generate a review summary for a time period. Shows tasks completed, tasks created (still open), stale tasks (no dates), project changelog entries, and upcoming tasks. Defaults to since last Friday.",
+      "Generate a review summary for a time period. Shows tasks completed, tasks created (still open), tasks needing triage (no dates or stale high-priority), project changelog entries, and upcoming tasks. Defaults to since last Friday.",
     inputSchema: {
       type: "object",
       properties: {
@@ -665,6 +674,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "sift_summary": {
         const result = runSift(["summary"]);
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      }
+
+      case "sift_agenda": {
+        const result = runSift(["agenda", "--show-file", "--absolute"]);
         return {
           content: [{ type: "text", text: result }],
         };
