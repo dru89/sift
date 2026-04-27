@@ -17,7 +17,7 @@ The following custom tools are available for interacting with the user's tasks a
 - **`sift_next`** - Get the most important tasks overall, sorted by urgency score (blends due date proximity, priority, scheduled date, and in-progress status)
 - **`sift_summary`** - Quick overview: today's agenda, counts, and what's up next
 - **`sift_add`** - Add a new task to today's daily note, or to a specific project/area. Auto-reopens "done" projects when a task is added to them.
-- **`sift_find`** - Search for tasks without modifying them (use before `sift_done`, `sift_mark`, `sift_update`, or `sift_move`; pass `all: true` to include completed/cancelled)
+- **`sift_find`** - Search for tasks without modifying them (use before `sift_done`, `sift_mark`, `sift_update`, or `sift_move`; pass `all: true` to include all statuses, or `status: "done"` to find completed tasks for error recovery)
 - **`sift_done`** - Mark a task as complete (requires file+line from `sift_find`; confirm with user first; pass `description` for safety)
 - **`sift_mark`** - Mark a task with any status: `in_progress`, `on_hold`, `moved`, `cancelled`, `open`, or `done` (use `sift_find` first; pass `description` for safety)
 - **`sift_update`** - Modify a task's metadata in place: priority, due date, scheduled date, start date. Operates by file+line like `sift_done`. Pass "none" for a field to remove it. Use `sift_find` first; confirm with user before calling.
@@ -105,6 +105,15 @@ Tasks use the Obsidian Tasks emoji format:
 - Use `sift_next` when the user asks about priorities overall — "what's most important?", "what should I work on next?"
 - Use `sift_summary` for a quick overview (includes both agenda and next)
 - When the user says something like "I need to remember to X" or "add a task to Y", use `sift_add`
+
+### Correcting mistakes
+
+If you mark the wrong task as done or set the wrong status, you can undo it:
+
+1. Call `sift_find` with `status: "done"` (or whichever status you set) to locate the task. The default filter hides completed tasks, so you need the status parameter to find them.
+2. Call `sift_mark` with `status: "open"` to restore it.
+
+Don't call `sift_find` without a status filter and assume the task is gone. It's still there, just filtered out of the default view.
 
 ## Writing task descriptions
 

@@ -313,15 +313,22 @@ export async function createSubnote(
  *
  * @param config - The sift configuration
  * @param search - Text to search for in task descriptions
- * @param options - Optional settings: `all` includes done/cancelled tasks
+ * @param options - Optional settings: `all` includes all statuses, `status` filters to specific statuses
  * @returns Array of matching tasks
  */
 export async function findTasks(
   config: SiftConfig,
   search: string,
-  options?: { all?: boolean },
+  options?: { all?: boolean; status?: TaskStatus | TaskStatus[] },
 ): Promise<Task[]> {
-  const statusFilter = options?.all ? undefined : ACTIONABLE_STATUSES;
+  let statusFilter: TaskStatus | TaskStatus[] | undefined;
+  if (options?.status) {
+    statusFilter = options.status;
+  } else if (options?.all) {
+    statusFilter = undefined;
+  } else {
+    statusFilter = ACTIONABLE_STATUSES;
+  }
   const tasks = await scanTasks(config, { status: statusFilter });
   return tasks.filter((t) => matchesSearch(t.description, search));
 }

@@ -248,13 +248,25 @@ program
   .option("--show-file", "Show file path for each task")
   .option("--absolute", "Show absolute file paths instead of vault-relative")
   .option("-a, --all", "Include completed and cancelled tasks")
+  .option("--status <status>", "Filter to a specific status: open, in_progress, done, cancelled, on_hold, moved")
   .action(async (searchParts: string[], opts) => {
     const config = await resolveConfig();
     const search = searchParts.join(" ");
-    const matches = await findTasks(config, search, { all: opts.all });
+
+    const validStatuses = ["open", "in_progress", "done", "cancelled", "on_hold", "moved"];
+    if (opts.status && !validStatuses.includes(opts.status)) {
+      console.error(chalk.red("Invalid status: ") + opts.status);
+      console.error(chalk.dim("Valid values: " + validStatuses.join(", ")));
+      process.exit(1);
+    }
+
+    const matches = await findTasks(config, search, {
+      all: opts.all,
+      status: opts.status as TaskStatus | undefined,
+    });
 
     if (matches.length === 0) {
-      const scope = opts.all ? "tasks" : "open tasks";
+      const scope = opts.status ? `${opts.status} tasks` : opts.all ? "tasks" : "open tasks";
       console.log(chalk.yellow(`No ${scope} matching: `) + search);
       return;
     }

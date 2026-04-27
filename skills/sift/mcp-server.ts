@@ -207,7 +207,7 @@ const tools: Tool[] = [
   {
     name: "sift_find",
     description:
-      "Search for open tasks matching a query without modifying them. Returns matching tasks with file paths and line numbers. Use this before sift_done to preview which task will be completed.",
+      "Search for open tasks matching a query without modifying them. Returns matching tasks with file paths and line numbers. Use this before sift_done to preview which task will be completed. To find recently completed or cancelled tasks (e.g., to undo a mistake), pass a specific status filter.",
     inputSchema: {
       type: "object",
       properties: {
@@ -217,7 +217,12 @@ const tools: Tool[] = [
         },
         all: {
           type: "boolean",
-          description: "Include completed and cancelled tasks (default: only open/in_progress)",
+          description: "Include all tasks regardless of status (default: only open/in_progress)",
+        },
+        status: {
+          type: "string",
+          enum: ["open", "in_progress", "done", "cancelled", "on_hold", "moved"],
+          description: "Filter to a specific status. Overrides the default open/in_progress filter. Use 'done' to find recently completed tasks (e.g., to undo a mistaken completion).",
         },
       },
       required: ["search"],
@@ -810,6 +815,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "sift_find": {
         const cliArgs = ["find", "--show-file", "--absolute"];
         if (args?.all) cliArgs.push("--all");
+        if (args?.status) cliArgs.push("--status", args.status as string);
         cliArgs.push("--", args?.search as string);
         const result = runSift(cliArgs);
         return {

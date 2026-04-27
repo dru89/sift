@@ -175,7 +175,7 @@ export const add = tool({
 
 export const find = tool({
   description:
-    "Search for open tasks matching a query without modifying them. Returns matching tasks with file paths and line numbers. Use this before sift_done to preview which task will be completed.",
+    "Search for open tasks matching a query without modifying them. Returns matching tasks with file paths and line numbers. Use this before sift_done to preview which task will be completed. To find recently completed or cancelled tasks (e.g., to undo a mistake), pass a specific status filter.",
   args: {
     search: tool.schema
       .string()
@@ -183,11 +183,16 @@ export const find = tool({
     all: tool.schema
       .boolean()
       .optional()
-      .describe("Include completed and cancelled tasks (default: only open/in_progress)"),
+      .describe("Include all tasks regardless of status (default: only open/in_progress)"),
+    status: tool.schema
+      .enum(["open", "in_progress", "done", "cancelled", "on_hold", "moved"])
+      .optional()
+      .describe("Filter to a specific status. Overrides the default open/in_progress filter. Use 'done' to find recently completed tasks (e.g., to undo a mistaken completion)."),
   },
   async execute(args) {
     const cliArgs = ["find", "--show-file", "--absolute"];
     if (args.all) cliArgs.push("--all");
+    if (args.status) cliArgs.push("--status", args.status);
     cliArgs.push("--", args.search);
     return runSift(cliArgs);
   },
