@@ -16,6 +16,13 @@ const DEFAULT_REVIEW_INTERVALS: Record<string, number> = {
 /** How far back to look for daily-note orphans (days). */
 const ORPHAN_LOOKBACK_DAYS = 30;
 
+/**
+ * Exclude orphans from the most recent N days — these are still on the
+ * agenda via the daily-note recency filter and don't need to appear in
+ * triage too. After this window they fall off the agenda and into triage.
+ */
+const ORPHAN_AGENDA_OVERLAP_DAYS = 7;
+
 /** A scheduled date is "stale" if it's this many weeks in the past. */
 const STALE_SCHEDULED_WEEKS = 2;
 
@@ -288,6 +295,7 @@ function findOrphanTasks(
   today: string,
 ): OrphanTask[] {
   const cutoff = addDays(today, -ORPHAN_LOOKBACK_DAYS);
+  const agendaCutoff = addDays(today, -ORPHAN_AGENDA_OVERLAP_DAYS);
   const dailyNotesPrefix = config.dailyNotesPath + "/";
 
   // Build a set of project/area file paths for quick exclusion
@@ -310,8 +318,11 @@ function findOrphanTasks(
     if (projectFiles.has(task.filePath)) continue;
 
     // Must be from a recent daily note (within ORPHAN_LOOKBACK_DAYS)
+    // but NOT within the agenda recency window (last 7 days) — those
+    // are already surfaced on the agenda and showing them here is noise.
     const noteDate = extractDateFromDailyNote(task.filePath, config);
     if (!noteDate || noteDate < cutoff) continue;
+    if (noteDate >= agendaCutoff) continue;
 
     // Extract wiki-link mentions
     const mentionedProjects = extractWikiLinkProjects(task.description, projectNames);
