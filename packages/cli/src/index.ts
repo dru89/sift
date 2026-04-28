@@ -586,6 +586,25 @@ projectCmd
       if (opts.timeframe) console.log(chalk.dim("  timeframe: ") + opts.timeframe);
       if (opts.tags) console.log(chalk.dim("  tags: ") + (opts.tags as string[]).map((t: string) => `#${t}`).join(" "));
       if (opts.reviewInterval) console.log(chalk.dim("  reviewInterval: ") + opts.reviewInterval + " days");
+
+      // Warn about open tasks when closing a project
+      if (opts.status === "done") {
+        const project = await findProject(config, name);
+        if (project) {
+          const openTasks = await scanTasks(config, {
+            status: ACTIONABLE_STATUSES,
+            filePatterns: [project.filePath],
+          });
+          if (openTasks.length > 0) {
+            console.log();
+            console.log(chalk.yellow(`  ⚠ This project has ${openTasks.length} open task${openTasks.length > 1 ? "s" : ""}:`));
+            for (const task of openTasks) {
+              console.log("    " + formatTask(task, { showFile: true }));
+            }
+            console.log(chalk.dim("  Consider cancelling, completing, or moving these tasks."));
+          }
+        }
+      }
     } catch (err: any) {
       console.error(chalk.red("Error: ") + err.message);
       process.exit(1);

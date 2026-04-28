@@ -322,6 +322,20 @@ Don't suggest triage unprompted every session. Once a week during standup prep i
 
 **For bulk operations:** When the user wants to stamp multiple tier 2 projects as reviewed, list them all and confirm once ("Mark all 8 as reviewed?"), then call `sift_project_review` for each.
 
+### Closing projects
+
+When the user wants to mark a project as done, check for open tasks first. The CLI warns about them automatically, but agents should handle the follow-up:
+
+1. Call `sift_list` with the project name to see what's still open.
+2. If there are open tasks, present them and ask what to do: "This project has 4 open tasks. Want to cancel them all, complete some, or move any to a different project?"
+3. Resolve each task before (or immediately after) setting the status to done. Common actions:
+   - **Cancel** (`sift_mark --status cancelled`) tasks that are no longer relevant
+   - **Complete** (`sift_done`) tasks that were actually finished as part of the project
+   - **Move** (`sift_move`) tasks that should live on a different project or area
+4. Then call `sift_project_set --status done`.
+
+Don't mark a project done and leave open tasks dangling. They'll show up as a tier 1 triage signal ("marked done but has N open tasks"), and the user will have to deal with them later in a worse context.
+
 ## Area-scoped task queries
 
 When the user asks about work in an area ("what's on my plate for Sift?", "what do I have to do on Homelab?"), use `sift_list` with the area name as `project`. It automatically expands to include tasks from all projects that declare that area in their frontmatter — you don't need to enumerate them manually.
