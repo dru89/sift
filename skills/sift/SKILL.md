@@ -56,6 +56,8 @@ The vault distinguishes between **areas** and **projects**:
 
 When creating something new: does it have a finish line? If yes → project (`sift_project_create`). If it's ongoing → area (`sift_area_create`).
 
+When creating a project during active work, add at least one actionable task. A project with no tasks is a note, not a project — there's nothing to drive it forward, and it'll sit empty in triage reviews until someone figures out what was supposed to go on it. Planning-stage placeholders can start empty, but set their status to `planning` or `someday` so triage treats them accordingly.
+
 ## Task statuses
 
 Tasks use Obsidian checkbox characters for status:
