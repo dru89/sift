@@ -17,7 +17,7 @@ const DEFAULT_REVIEW_INTERVALS: Record<string, number> = {
 const ORPHAN_LOOKBACK_DAYS = 30;
 
 /** A scheduled date is "stale" if it's this many weeks in the past. */
-const STALE_SCHEDULED_WEEKS = 4;
+const STALE_SCHEDULED_WEEKS = 2;
 
 /** A project is "inactive" if it has no activity for this many weeks. */
 const INACTIVE_WEEKS = 4;
@@ -190,10 +190,10 @@ export async function getTriageSummary(
       signals.push({ kind: "stale_tasks", count: staleTasks.length });
     }
 
-    // Signal: undated tasks — projects only, and only when there's been
-    // no recent activity. Areas naturally accumulate undated backlog tasks
-    // ("someday/maybe" items) and shouldn't be flagged for them.
-    if (project.kind === "project") {
+    // Signal: undated tasks — active/planning projects only, and only when
+    // there's been no recent activity. Areas and someday projects naturally
+    // accumulate undated backlog tasks and shouldn't be flagged for them.
+    if (project.kind === "project" && effectiveStatus !== "someday") {
       const undatedTasks = actionableTasks.filter(t =>
         t.due === null && t.scheduled === null && t.start === null,
       );
