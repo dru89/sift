@@ -338,6 +338,20 @@ When the user wants to mark a project as done, check for open tasks first. The C
 
 Don't mark a project done and leave open tasks dangling. They'll show up as a tier 1 triage signal ("marked done but has N open tasks"), and the user will have to deal with them later in a worse context.
 
+### Batch operations and line stability
+
+Tasks are identified by file path and line number. When you mutate a task (complete, cancel, move, update), line numbers for other tasks in the same file may shift. A task that was at line 15 before you cancelled the task at line 13 is now at line 14.
+
+When operating on multiple tasks in the same file, re-find after each mutation. The pattern is:
+
+1. `sift_find` to locate the first task. Confirm with user, then act.
+2. If the next task is in the same file, call `sift_find` again before acting on it. The previous line number is stale.
+3. Repeat.
+
+This adds a round-trip per operation, but it's safe. The `description` safety check on `sift_done`, `sift_mark`, `sift_update`, and `sift_move` will catch stale line numbers (the wrong task will be at that line), but re-finding avoids the error entirely.
+
+For tasks in different files, line numbers don't affect each other — you can act on them without re-finding.
+
 ## Area-scoped task queries
 
 When the user asks about work in an area ("what's on my plate for Sift?", "what do I have to do on Homelab?"), use `sift_list` with the area name as `project`. It automatically expands to include tasks from all projects that declare that area in their frontmatter — you don't need to enumerate them manually.
