@@ -399,7 +399,9 @@ function isReviewOverdue(project: ProjectInfo, intervalDays: number, today: stri
 
 /**
  * Compute the most recent activity date for a project.
- * Activity = task completion, task creation, or changelog entry.
+ * Activity = task completion, task creation, changelog entry, or review.
+ * A review counts because it's a conscious acknowledgment that the project
+ * was looked at — it shouldn't keep surfacing as "inactive" after that.
  */
 function getLastActivityDate(
   project: ProjectInfo,
@@ -428,6 +430,11 @@ function getLastActivityDate(
     if (entry.project === project.name && (!latest || entry.date > latest)) {
       latest = entry.date;
     }
+  }
+
+  // Last review date
+  if (project.lastReviewed && (!latest || project.lastReviewed > latest)) {
+    latest = project.lastReviewed;
   }
 
   return latest;
