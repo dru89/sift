@@ -22,17 +22,22 @@ import {
   markTaskStatus,
   updateTask,
   moveTask,
+  promoteTask,
   listProjects,
   findProject,
   createProject,
   createArea,
   setProjectField,
+  createThread,
+  addThreadEntry,
+  updateThreadState,
   localToday,
   addDays,
   previousDayOfWeek,
   ACTIONABLE_STATUSES,
   type Priority,
   type TaskStatus,
+  type ThreadState,
   type SiftConfig,
   type Task,
   type TriageSignal,
@@ -194,6 +199,39 @@ program
       console.log(chalk.dim("  Nothing on the agenda today."));
     } else {
       console.log(formatTaskList(tasks, "📋 Today's Agenda", fmtOpts));
+    }
+  });
+
+// ─── sift open ───────────────────────────────────────────────
+program
+  .command("open <file...>")
+  .description("Open a file in Obsidian")
+  .option("--new-tab", "Open in a new tab")
+  .action(async (fileParts: string[], opts) => {
+    const file = fileParts.join(" ");
+
+    try {
+      const { execFileSync } = await import("child_process");
+      const isPath = file.includes("/") || file.includes("\\");
+      const paramName = isPath ? "path" : "file";
+      const cliArgs = ["open", `${paramName}=${file}`];
+      if (opts.newTab) cliArgs.push("newtab");
+
+      execFileSync("obsidian", cliArgs, {
+        encoding: "utf-8",
+        timeout: 15000,
+      });
+      console.log(chalk.green("✓") + ` Opened "${file}" in Obsidian`);
+    } catch (error: any) {
+      if (error.message?.includes("ENOENT")) {
+        console.error(chalk.red("Error: ") + "Obsidian CLI is not installed. Install it in Obsidian Settings → General → Command line interface.");
+      } else if (error.message?.includes("ETIMEDOUT")) {
+        console.error(chalk.red("Error: ") + "Obsidian CLI timed out. Make sure Obsidian is running.");
+      } else {
+        const stderr = error.stderr?.toString()?.trim();
+        console.error(chalk.red("Error: ") + (stderr || error.message));
+      }
+      process.exit(1);
     }
   });
 
@@ -1183,6 +1221,233 @@ program
     if (config.project) {
       console.log();
       console.log(chalk.dim(`📁 CWD project: ${config.project}`));
+    }
+  });
+
+// ─── sift thread ─────────────────────────────────────────────
+
+const threadCmd = program
+  .command("thread")
+  .description("Manage conversation threads on tasks");
+
+threadCmd
+  .command("create")
+  .description("Start a new thread on a task")
+  .requiredOption("--file <path>", "File path containing the task")
+  .requiredOption("--line <number>", "Line number of the task (1-indexed)")
+  .requiredOption("--with <names...>", "Counterparts (people or teams)")
+  .option("--state <state>", "Initial state: active, waiting, paused", "active")
+  .option("--follow-up <date>", "Follow-up date (YYYY-MM-DD)")
+  .option("--source <url>", "URL or markdown link to conversation")
+  .option("--date <date>", "Date for first entry (YYYY-MM-DD, default: today)")
+  .argument("[entry]", "First entry description")
+  .action(async (entry: string | undefined, opts) => {
+    const config = await resolveConfig();
+    try {
+      const result = await createThread(config, {
+        file: opts.file,
+        line: parseInt(opts.line, 10),
+        counterparts: opts.with,
+        state: opts.state as ThreadState,
+        followUp: opts.followUp,
+        source: opts.source,
+        content: entry,
+        date: opts.date,
+      });
+      console.log(chalk.green("✓") + ` Created thread on: ${result.task}`);
+      console.log(chalk.dim("  Counterparts: ") + result.counterparts.map((c) => `[[${c}]]`).join(", "));
+      console.log(chalk.dim("  State: ") + result.state);
+      if (result.followUp) console.log(chalk.dim("  Follow-up: ") + result.followUp);
+      if (result.lastEntry) console.log(chalk.dim("  Entry: ") + `${result.lastEntry.date}: ${result.lastEntry.description}`);
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
+    }
+  });
+
+threadCmd
+  .command("entry")
+  .description("Add a timestamped entry to an existing thread")
+  .requiredOption("--file <path>", "File path containing the task")
+  .requiredOption("--line <number>", "Line number of the task (1-indexed)")
+  .option("--state <state>", "Change thread state: active, waiting, paused, resolved")
+  .option("--follow-up <date>", "Set/update follow-up date (YYYY-MM-DD, or 'none' to clear)")
+  .option("--date <date>", "Entry date (YYYY-MM-DD, default: today)")
+  .argument("<content>", "What happened (one line)")
+  .action(async (content: string, opts) => {
+    const config = await resolveConfig();
+    try {
+      const result = await addThreadEntry(config, {
+        file: opts.file,
+        line: parseInt(opts.line, 10),
+        content,
+        state: opts.state as ThreadState | undefined,
+        followUp: opts.followUp,
+        date: opts.date,
+      });
+      console.log(chalk.green("✓") + ` Added entry to thread on: ${result.task}`);
+      console.log(chalk.dim("  State: ") + result.state);
+      if (result.followUp) console.log(chalk.dim("  Follow-up: ") + result.followUp);
+      console.log(chalk.dim("  Entry: ") + `${result.lastEntry!.date}: ${result.lastEntry!.description}`);
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
+    }
+  });
+
+threadCmd
+  .command("state")
+  .description("Change thread metadata without adding an entry")
+  .requiredOption("--file <path>", "File path containing the task")
+  .requiredOption("--line <number>", "Line number of the task (1-indexed)")
+  .option("--state <state>", "New state: active, waiting, paused, resolved")
+  .option("--follow-up <date>", "Set/update/clear follow-up (YYYY-MM-DD, or 'none')")
+  .option("--with <names...>", "Replace counterpart list")
+  .option("--source <url>", "Update source link ('none' to clear)")
+  .action(async (opts) => {
+    const config = await resolveConfig();
+    try {
+      const result = await updateThreadState(config, {
+        file: opts.file,
+        line: parseInt(opts.line, 10),
+        state: opts.state as ThreadState | undefined,
+        followUp: opts.followUp,
+        counterparts: opts.with,
+        source: opts.source,
+      });
+      console.log(chalk.green("✓") + ` Updated thread on: ${result.task}`);
+      console.log(chalk.dim("  Counterparts: ") + result.counterparts.map((c) => `[[${c}]]`).join(", "));
+      console.log(chalk.dim("  State: ") + result.state);
+      if (result.followUp) console.log(chalk.dim("  Follow-up: ") + result.followUp);
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
+    }
+  });
+
+threadCmd
+  .command("list")
+  .description("List threads needing attention")
+  .option("--state <state>", "Filter by state: active, waiting, paused, resolved")
+  .option("--stale", "Only show stale threads (past follow-up or undated waiting > 2 days)")
+  .option("--counterpart <name>", "Filter by counterpart name")
+  .option("--project <name>", "Filter to a specific project")
+  .action(async (opts) => {
+    const config = await resolveConfig();
+    const allTasks = await scanTasks(config);
+    const tasksWithThreads = allTasks.filter((t) => t.thread !== null);
+
+    // Filter by state
+    const states: ThreadState[] = opts.state
+      ? [opts.state as ThreadState]
+      : ["active", "waiting"];
+    let filtered = tasksWithThreads.filter((t) => states.includes(t.thread!.state));
+
+    // Filter by counterpart
+    if (opts.counterpart) {
+      const search = opts.counterpart.toLowerCase();
+      filtered = filtered.filter((t) =>
+        t.thread!.counterparts.some((c) => c.toLowerCase().includes(search)),
+      );
+    }
+
+    // Filter by project
+    if (opts.project) {
+      filtered = filtered.filter((t) => t.filePath.includes(opts.project));
+    }
+
+    // Filter stale
+    if (opts.stale) {
+      const today = localToday();
+      filtered = filtered.filter((t) => {
+        const thread = t.thread!;
+        if (thread.followUp && thread.followUp < today) return true;
+        if (thread.state === "waiting" && !thread.followUp && thread.entries.length > 0) {
+          const last = thread.entries[thread.entries.length - 1];
+          if (last.date) {
+            const daysSince = Math.floor(
+              (new Date(today).getTime() - new Date(last.date).getTime()) / (1000 * 60 * 60 * 24),
+            );
+            return daysSince > 2;
+          }
+        }
+        return false;
+      });
+    }
+
+    if (filtered.length === 0) {
+      console.log(chalk.dim("No threads found matching criteria."));
+      return;
+    }
+
+    // Display
+    const counts = {
+      active: tasksWithThreads.filter((t) => t.thread!.state === "active").length,
+      waiting: tasksWithThreads.filter((t) => t.thread!.state === "waiting").length,
+      paused: tasksWithThreads.filter((t) => t.thread!.state === "paused").length,
+    };
+
+    console.log(chalk.bold(`Threads`) + chalk.dim(` (${counts.active} active, ${counts.waiting} waiting, ${counts.paused} paused)`));
+    console.log();
+
+    for (const task of filtered) {
+      const thread = task.thread!;
+      const counterparts = thread.counterparts.map((c) => `[[${c}]]`).join(", ");
+      const stateLabel = thread.state === "waiting" ? chalk.yellow(`waiting on ${counterparts}`) : chalk.cyan(thread.state);
+
+      let taskLine = `  ${task.description} ${chalk.dim("·")} ${stateLabel}`;
+      if (thread.followUp) {
+        const today = localToday();
+        const overdue = thread.followUp < today;
+        taskLine += overdue
+          ? chalk.dim(" · ") + chalk.red(`follow-up: ${thread.followUp} (overdue)`)
+          : chalk.dim(` · follow-up: ${thread.followUp}`);
+      }
+      console.log(taskLine);
+
+      if (thread.entries.length > 0) {
+        const last = thread.entries[thread.entries.length - 1];
+        console.log(chalk.dim(`    last: ${last.date || "undated"}: ${last.description}`));
+      }
+
+      const displayPath = path.join(config.vaultPath, task.filePath);
+      console.log(chalk.dim(`    ${displayPath}:${task.line}`));
+      console.log();
+    }
+  });
+
+// ─── sift promote ────────────────────────────────────────────
+program
+  .command("promote")
+  .description("Upgrade a task to a project (moves task + thread into new project file)")
+  .requiredOption("--file <path>", "File path containing the task")
+  .requiredOption("--line <number>", "Line number of the task (1-indexed)")
+  .option("--name <name>", "Project name (default: task description)")
+  .option("--area <area>", "Parent area for the new project")
+  .option("--status <status>", "Initial project status (default: active)")
+  .option("--tags <tags>", "Comma-separated tags")
+  .option("--description <text>", "Safety check: partial task text to verify")
+  .action(async (opts) => {
+    const config = await resolveConfig();
+    try {
+      const result = await promoteTask(config, {
+        file: opts.file,
+        line: parseInt(opts.line, 10),
+        name: opts.name,
+        area: opts.area,
+        status: opts.status,
+        tags: opts.tags ? (opts.tags as string).split(",").map((t: string) => t.trim()) : undefined,
+        description: opts.description,
+      });
+      console.log(chalk.green("✓") + ` Promoted task to project: "${result.projectName}"`);
+      console.log(chalk.dim("  Task: ") + result.task);
+      console.log(chalk.dim("  Project file: ") + path.join(config.vaultPath, result.projectFile));
+      if (result.hadThread) {
+        console.log(chalk.dim("  Thread: ") + "preserved");
+      }
+    } catch (err: any) {
+      console.error(chalk.red("Error: ") + err.message);
+      process.exit(1);
     }
   });
 
