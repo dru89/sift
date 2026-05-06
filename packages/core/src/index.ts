@@ -24,6 +24,8 @@ export { listProjects, findProject, createProject, createArea, setProjectField }
 export type { CreateItemOptions } from "./projects.js";
 export { getTriageSummary } from "./triage.js";
 export type { TriageSummary, TriageSignal, Tier1Project, Tier2Project, Tier3Group, OrphanTask } from "./triage.js";
+export { vaultWrite, vaultReplace } from "./vault.js";
+export type { VaultWriteResult, VaultReplaceResult } from "./vault.js";
 export { resolveConfig, writeConfig } from "./config.js";
 export { localToday, localDateString, addDays, previousDayOfWeek, daysBetween } from "./dates.js";
 export type {

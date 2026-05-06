@@ -37,6 +37,8 @@ import {
   addThreadEntry,
   updateThreadState,
   promoteTask,
+  vaultWrite,
+  vaultReplace,
   parseThread,
   type Task,
   type SiftConfig,
@@ -1297,6 +1299,37 @@ export async function toolPromote(args: PromoteArgs): Promise<string> {
   }
 
   return lines.join("\n");
+}
+
+// ─── Vault Write/Replace ─────────────────────────────────────
+
+export interface VaultWriteArgs {
+  path: string;
+  content: string;
+}
+
+export async function toolVaultWrite(args: VaultWriteArgs): Promise<string> {
+  const config = await getConfig();
+  const result = await vaultWrite(config, args.path, args.content);
+  const action = result.created ? "Created" : "Updated";
+  const absPath = `${config.vaultPath}/${result.path}`;
+  return `✓ ${action}: ${absPath}`;
+}
+
+export interface VaultReplaceArgs {
+  path: string;
+  old_str: string;
+  new_str: string;
+}
+
+export async function toolVaultReplace(args: VaultReplaceArgs): Promise<string> {
+  const config = await getConfig();
+  const result = await vaultReplace(config, args.path, args.old_str, args.new_str);
+  const absPath = `${config.vaultPath}/${result.path}`;
+  if (args.new_str === "") {
+    return `✓ Deleted ${result.replacedLength} characters from ${absPath}`;
+  }
+  return `✓ Replaced ${result.replacedLength} chars with ${result.newLength} chars in ${absPath}`;
 }
 
 // ─── Export for testing ──────────────────────────────────────

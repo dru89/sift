@@ -34,6 +34,8 @@ import {
   toolTriage,
   toolReview,
   toolPromote,
+  toolVaultWrite,
+  toolVaultReplace,
 } from "./tool-impls.js";
 
 /**
@@ -842,6 +844,48 @@ const tools: Tool[] = [
       required: ["file", "line"],
     },
   },
+  {
+    name: "vault_write",
+    description:
+      "Write content to a vault file. Creates the file if it doesn't exist; overwrites if it does. Use for creating/regenerating reference files, blueprints, or any file the agent is managing wholesale.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Vault-relative path (e.g., 'Health Tracker/_shortcut-log.md')",
+        },
+        content: {
+          type: "string",
+          description: "Full file content to write",
+        },
+      },
+      required: ["path", "content"],
+    },
+  },
+  {
+    name: "vault_replace",
+    description:
+      "Perform a targeted find-and-replace within a vault file. The old string must match exactly once. Use for surgical edits to project files, notes, or blueprints without clobbering surrounding content.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Vault-relative path",
+        },
+        old_str: {
+          type: "string",
+          description: "Exact string to find (must match exactly once in the file)",
+        },
+        new_str: {
+          type: "string",
+          description: "Replacement string (empty string to delete the match)",
+        },
+      },
+      required: ["path", "old_str", "new_str"],
+    },
+  },
 ];
 
 // Create server instance
@@ -1231,6 +1275,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           status: args?.status as string | undefined,
           tags: args?.tags as string[] | undefined,
           description: args?.description as string | undefined,
+        });
+        return { content: [{ type: "text", text: result }] };
+      }
+
+      case "vault_write": {
+        const result = await toolVaultWrite({
+          path: args!.path as string,
+          content: args!.content as string,
+        });
+        return { content: [{ type: "text", text: result }] };
+      }
+
+      case "vault_replace": {
+        const result = await toolVaultReplace({
+          path: args!.path as string,
+          old_str: args!.old_str as string,
+          new_str: args!.new_str as string,
         });
         return { content: [{ type: "text", text: result }] };
       }
