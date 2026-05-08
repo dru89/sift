@@ -62,6 +62,46 @@ function runObsidian(args: string[]): string {
   }
 }
 
+/**
+ * Extract content under a specific heading from file content using outline data.
+ * Returns everything from the heading line through to (but not including) the next
+ * heading of equal or higher level, or end of file.
+ */
+function extractHeadingSection(
+  content: string,
+  outlineJson: string,
+  heading: string,
+): string {
+  const lines = content.split("\n");
+  const outline: Array<{ level: number; heading: string; line: number }> =
+    JSON.parse(outlineJson);
+
+  // Find the target heading (case-insensitive, strip leading ##)
+  const normalizedTarget = heading.replace(/^#+\s*/, "").trim().toLowerCase();
+  const targetIdx = outline.findIndex(
+    (h) => h.heading.toLowerCase() === normalizedTarget,
+  );
+
+  if (targetIdx === -1) {
+    const available = outline.map((h) => `${"#".repeat(h.level)} ${h.heading}`);
+    return `Error: Heading "${heading}" not found. Available headings:\n${available.join("\n")}`;
+  }
+
+  const target = outline[targetIdx];
+  const startLine = target.line - 1; // outline uses 1-indexed lines
+
+  // Find the end: next heading at same or higher (lower number) level
+  let endLine = lines.length;
+  for (let i = targetIdx + 1; i < outline.length; i++) {
+    if (outline[i].level <= target.level) {
+      endLine = outline[i].line - 1;
+      break;
+    }
+  }
+
+  return lines.slice(startLine, endLine).join("\n").trimEnd();
+}
+
 // Define the tools
 const tools: Tool[] = [
   {
@@ -695,7 +735,7 @@ const tools: Tool[] = [
   {
     name: "vault_read",
     description:
-      "Read the contents of a vault file by name (wikilink-style resolution) or exact path. Requires Obsidian to be running.",
+      "Read the contents of a vault file by name (wikilink-style resolution) or exact path. Optionally pass a heading to return only that section. Requires Obsidian to be running.",
     inputSchema: {
       type: "object",
       properties: {
@@ -703,6 +743,11 @@ const tools: Tool[] = [
           type: "string",
           description:
             "File name (wikilink-style resolution, e.g., 'Sift' finds 'Projects/Sift.md') or exact path.",
+        },
+        heading: {
+          type: "string",
+          description:
+            "Return only the content under this heading (e.g., '## Tasks' or 'Tasks'). Includes subheadings. If omitted, returns the full file.",
         },
       },
       required: ["file"],
@@ -1199,10 +1244,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Determine if this is a name or a path (handles both / and \ separators)
         const fileArg = args?.file as string;
         const paramName = fileArg.includes("/") || fileArg.includes("\\") ? "path" : "file";
-        const result = runObsidian(["read", `${paramName}=${fileArg}`]);
-        return {
-          content: [{ type: "text", text: result }],
-        };
+        const content = runObsidian(["read", `${paramName}=${fileArg}`]);
+
+        const heading = args?.heading as string | undefined;
+        if (!heading || content.startsWith("Error:")) {
+          return { content: [{ type: "text", text: content }] };
+        }
+
+        // Fetch outline to find heading boundaries
+        const outlineJson = runObsidian(["outline", `${paramName}=${fileArg}`, "format=json"]);
+        if (outlineJson.startsWith("Error:")) {
+          return { content: [{ type: "text", text: content }] }; // Fall back to full content
+        }
+
+        const section = extractHeadingSection(content, outlineJson, heading);
+        return { content: [{ type: "text", text: section }] };
       }
 
       case "vault_outline": {

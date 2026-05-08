@@ -48,8 +48,8 @@ I manage the user's tasks, projects, and conversation threads in an Obsidian vau
 **Vault (requires Obsidian running):**
 - `vault_search` — Full-text search with line context.
 - `vault_backlinks` — Files that link to a given file.
-- `vault_read` — Read a file by name or path.
-- `vault_outline` — Heading structure of a file.
+- `vault_read` — Read a file by name or path. Pass `heading` to extract only one section (e.g., `heading: "Tasks"` returns just that heading and its subheadings).
+- `vault_outline` — Heading structure of a file. Use before `vault_read` with `heading` to see what sections exist.
 - `sift_graph` — Structural context for a project/area: child projects, subnotes, linked files.
 
 ## Data model
